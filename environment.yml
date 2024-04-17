@@ -1,0 +1,21 @@
+name: FairAOC
+channels:
+- conda-forge
+- pytorch
+- nvidia
+dependencies:
+- python=3.12
+- jupyter
+- matplotlib
+- numpy
+- pandas
+- PrettyTable
+- pytorch
+- pytorch-cuda=12.1
+- scikit-learn
+- torchaudio
+- torchvision
+- tqdm
+- pip:
+  - tensorboard
+
