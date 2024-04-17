@@ -5,11 +5,7 @@ import math
 import os
 import random
 
-from matplotlib.lines import Line2D
-from matplotlib.patches import Patch
-from sklearn.manifold import TSNE
 from tqdm import tqdm
-import matplotlib.pyplot as plt
 import numpy.typing as npt
 import numpy as np
 import pandas as pd
@@ -24,9 +20,7 @@ import metrics
 import models
 
 parser = ArgumentParser()
-parser.add_argument(
-    "--model", type=str, choices=["RISAN", "KP1", "FNNC"], required=True
-)
+parser.add_argument("--model", type=str, choices=["RISAN", "KP1"], required=True)
 parser.add_argument(
     "--fairness_condition",
     type=str,
@@ -51,191 +45,28 @@ if DATASET == "german" or DATASET == "compas":
     BATCH_SIZE: int = 256
 else:
     BATCH_SIZE: int = 2048
-COST: float = args.cost
+COST: float = float(args.cost)
 DISABLE_TQDM = False if args.tqdm == "Yes" else True
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 WRITER = torch.utils.tensorboard.SummaryWriter(  # type: ignore
     f"runs/{DATASET}/{MODEL}/{FAIRNESS_CONDITION}/{COST}"
 )
 
+GAMMA = 0
+LR = 1e-3
 
-# def tsne(
-#     run_num: int,
-#     fold_num: int,
-#     test_dataloader: dataset.MultiEpochsDataLoader,
-#     model: models.RISAN | models.KP1 | models.FNNC,
-# ) -> None:
-#     """
-#     Creates two TSNE plots, one for predicitons and other for outcome type (true positive, false positive, etc).
-
-#     Args:
-#         run_num:
-#           Current run number
-#         fold_num:
-#           Current fold number
-#         test_dataloader:
-#           Dataloader containing test samples.
-#         model:
-#           Model for which the TSNE plots are to be plotted.
-#     """
-#     if DISABLE_TQDM:
-#         print("Creating tsne plots", flush=True)
-#     model.eval()
-#     os.makedirs(
-#         f"outputs/{DATASET}/{MODEL}/{FAIRNESS_CONDITION}/{COST:f}/", exist_ok=True
-#     )
-#     preds = []
-#     true = []
-#     sens = []
-#     last_hidden_layer_features = []
-
-#     for batch in tqdm(
-#         test_dataloader, desc="TSNE predictions", leave=False, disable=DISABLE_TQDM
-#     ):
-#         x, y, z = batch
-#         x, y, z = x.to(DEVICE), y.tolist(), z.tolist()
-
-#         if isinstance(model, models.FNNC) and model.rho is None:
-#             preds += model.infer_bin(x).tolist()
-#             last_hidden_layer_features += model.tsne(x).tolist()
-#         else:
-#             preds += model.infer(x).tolist()
-#             last_hidden_layer_features += model.tsne(x).tolist()
-
-#         true += y
-#         sens += z
-
-#     last_hidden_layer_features = np.array(last_hidden_layer_features)
-#     embeddings = TSNE().fit_transform(last_hidden_layer_features)
-
-#     coords_0, coords_1 = [], []
-#     color_ind_0, color_ind_1 = [], []
-#     color_sep_0, color_sep_1 = [], []
-
-#     for id in tqdm(
-#         range(len(preds)), desc="TSNE organizing", leave=False, disable=DISABLE_TQDM
-#     ):
-#         if true[id] == 0:
-#             coords_0.append(embeddings[id, :].tolist())
-#             if preds[id] == -1:
-#                 color_ind_0.append(0)
-#                 if true[id] == 0:
-#                     color_sep_0.append(0)
-#                 else:
-#                     color_sep_0.append(1)
-#             elif preds[id] == 0:
-#                 color_ind_0.append(1)
-#                 if true[id] == 0:
-#                     color_sep_0.append(2)
-#                 else:
-#                     color_sep_0.append(3)
-#             else:
-#                 color_ind_0.append(2)
-#                 if true[id] == 0:
-#                     color_sep_0.append(4)
-#                 else:
-#                     color_sep_0.append(5)
-#         else:
-#             coords_1.append(embeddings[id, :].tolist())
-#             if preds[id] == -1:
-#                 color_ind_1.append(0)
-#                 if true[id] == 0:
-#                     color_sep_1.append(0)
-#                 else:
-#                     color_sep_1.append(1)
-#             elif preds[id] == 0:
-#                 color_ind_1.append(1)
-#                 if true[id] == 0:
-#                     color_sep_1.append(2)
-#                 else:
-#                     color_sep_1.append(3)
-#             else:
-#                 color_ind_1.append(2)
-#                 if true[id] == 0:
-#                     color_sep_1.append(4)
-#                 else:
-#                     color_sep_1.append(5)
-#     coords_0 = np.array(coords_0)
-#     coords_1 = np.array(coords_1)
-
-#     colors = np.array(["black", "red", "green", "darkorange", "blue", "darkviolet"])
-
-#     legend_elements = [
-#         Line2D(
-#             [0],
-#             [0],
-#             marker=".",
-#             color="w",
-#             label="Group 0",
-#             markerfacecolor="k",
-#             markersize=15,
-#         ),
-#         Line2D(
-#             [0],
-#             [0],
-#             marker="x",
-#             color="w",
-#             label="Group 1",
-#             markerfacecolor="k",
-#             markersize=15,
-#         ),
-#         Patch(facecolor="black", edgecolor="w", label="ŷ = -1"),
-#         Patch(facecolor="red", edgecolor="w", label="ŷ = 0"),
-#         Patch(facecolor="green", edgecolor="w", label="ŷ = 1"),
-#     ]
-#     plt.title("TSNE on predictions")
-#     plt.scatter(coords_0[:, 0], coords_0[:, 1], c=colors[color_ind_0], marker=".")
-#     plt.scatter(coords_1[:, 0], coords_1[:, 1], c=colors[color_ind_1], marker="x")
-#     plt.legend(handles=legend_elements)
-#     if isinstance(model, models.FNNC) and model.rho is None:
-#         plt.savefig(
-#             f"outputs/{DATASET}/{MODEL}/{FAIRNESS_CONDITION}/{COST:f}/ind_bin_tsne_{run_num}_{fold_num}.png"
-#         )
-#     else:
-#         plt.savefig(
-#             f"outputs/{DATASET}/{MODEL}/{FAIRNESS_CONDITION}/{COST:f}/ind_tsne_{run_num}_{fold_num}.png"
-#         )
-#     plt.clf()
-
-#     legend_elements = [
-#         Line2D(
-#             [0],
-#             [0],
-#             marker=".",
-#             color="w",
-#             label="Group 0",
-#             markerfacecolor="k",
-#             markersize=15,
-#         ),
-#         Line2D(
-#             [0],
-#             [0],
-#             marker="x",
-#             color="w",
-#             label="Group 1",
-#             markerfacecolor="k",
-#             markersize=15,
-#         ),
-#         Patch(facecolor="black", edgecolor="w", label="ŷ = -1, y = 0"),
-#         Patch(facecolor="red", edgecolor="w", label="ŷ = -1, y = 1"),
-#         Patch(facecolor="green", edgecolor="w", label="ŷ = 0, y = 0"),
-#         Patch(facecolor="darkorange", edgecolor="w", label="ŷ = 0, y = 1"),
-#         Patch(facecolor="blue", edgecolor="w", label="ŷ = 1, y = 1"),
-#         Patch(facecolor="darkviolet", edgecolor="w", label="ŷ = 1, y = 0"),
-#     ]
-#     plt.title("TSNE on outcome type")
-#     plt.scatter(coords_0[:, 0], coords_0[:, 1], c=colors[color_sep_0], marker=".")
-#     plt.scatter(coords_1[:, 0], coords_1[:, 1], c=colors[color_sep_1], marker="x")
-#     plt.legend(handles=legend_elements)
-#     if isinstance(model, models.FNNC) and model.rho is None:
-#         plt.savefig(
-#             f"outputs/{DATASET}/{MODEL}/{FAIRNESS_CONDITION}/{COST:f}/sep_bin_tsne_{run_num}_{fold_num}.png"
-#         )
-#     else:
-#         plt.savefig(
-#             f"outputs/{DATASET}/{MODEL}/{FAIRNESS_CONDITION}/{COST:f}/sep_tsne_{run_num}_{fold_num}.png"
-#         )
-#     plt.clf()
+if DATASET == "adult":
+    if MODEL == "risan":
+        ...
+    elif MODEL == "kp1":
+        ...
+elif DATASET == "german":
+    if MODEL == "risan":
+        GAMMA = 5.5
+        LR = 1e-3
+    elif MODEL == "kp1":
+        GAMMA = 0.7
+        LR = 1e-3
 
 
 def train_epoch(
@@ -243,16 +74,15 @@ def train_epoch(
     fold_num: int,
     epoch_num: int,
     train_dataloader: dataset.MultiEpochsDataLoader,
-    model: models.RISAN | models.KP1 | models.FNNC,
-    model_loss_fn: metrics.DoubleSigmoidLoss
-    | metrics.GenralizedCrossEntropy
-    | nn.NLLLoss,
+    model: models.RISAN | models.KP1,
+    model_loss_fn: (
+        metrics.DoubleSigmoidLoss | metrics.GenralizedCrossEntropy | nn.NLLLoss
+    ),
     model_optimizer: torch.optim.Adam,
     lambdas: torch.Tensor | None,
-    fairness_loss_fn: metrics.DemographicParity
-    | metrics.EqualizedOdds
-    | metrics.MixedDPandEO
-    | None,
+    fairness_loss_fn: (
+        metrics.DemographicParity | metrics.EqualizedOdds | metrics.MixedDPandEO | None
+    ),
     lambdas_optimizer: torch.optim.Adam | None,
 ):
     """
@@ -310,8 +140,6 @@ def train_epoch(
             model_loss_val: torch.Tensor = model_loss_fn(out, y) + (
                 1 - COST
             ) * model_loss_fn(out, torch.full_like(y, 2))
-        elif isinstance(model, models.FNNC) and isinstance(model_loss_fn, nn.NLLLoss):
-            model_loss_val: torch.Tensor = model_loss_fn(probs[:, :-1], y)
         else:
             print("train_epoch() error: [1]")
             exit()
@@ -349,6 +177,8 @@ def train_epoch(
             lambdas_optimizer.zero_grad(set_to_none=True)
             loss.backward()
             lambdas_optimizer.step()
+            with torch.no_grad():
+                lambdas.clamp_(min=0)
             lambdas_loss += loss.detach()
 
     model_loss /= len(train_dataloader)
@@ -372,15 +202,14 @@ def dev_epoch(
     fold_num: int,
     epoch_num: int,
     test_dataloader: dataset.MultiEpochsDataLoader,
-    model: models.RISAN | models.KP1 | models.FNNC,
-    model_loss_fn: metrics.DoubleSigmoidLoss
-    | metrics.GenralizedCrossEntropy
-    | nn.NLLLoss,
+    model: models.RISAN | models.KP1,
+    model_loss_fn: (
+        metrics.DoubleSigmoidLoss | metrics.GenralizedCrossEntropy | nn.NLLLoss
+    ),
     lambdas: torch.Tensor | None,
-    fairness_loss_fn: metrics.DemographicParity
-    | metrics.EqualizedOdds
-    | metrics.MixedDPandEO
-    | None,
+    fairness_loss_fn: (
+        metrics.DemographicParity | metrics.EqualizedOdds | metrics.MixedDPandEO | None
+    ),
 ) -> torch.Tensor:
     """
     Runs one dev epoch for the model.
@@ -434,13 +263,6 @@ def dev_epoch(
                     1 - COST
                 ) * model_loss_fn(out, torch.full_like(y, 2))
                 preds = torch.concat((preds, model.infer(x)))
-            elif isinstance(model, models.FNNC) and isinstance(
-                model_loss_fn, nn.NLLLoss
-            ):
-                model_loss_val: torch.Tensor = model_loss_fn(probs[:, :-1], y)
-                preds = torch.concat(
-                    (preds, model.infer_bin(x))
-                )  # Since we train the model as a fair binary classifier
             else:
                 print("dev_epoch() error: [1]")
                 exit()
@@ -504,7 +326,7 @@ def dev_epoch(
 
 def test(
     test_dataloader: dataset.MultiEpochsDataLoader,
-    model: models.RISAN | models.KP1 | models.FNNC,
+    model: models.RISAN | models.KP1,
 ) -> dict[str, torch.Tensor]:
     """
     Tests the model and calculates its metrics.
@@ -535,10 +357,7 @@ def test(
             y = y.to(DEVICE)
             z = z.to(DEVICE)
 
-            if isinstance(model, models.FNNC) and model.rho is None:
-                preds = torch.concat((preds, model.infer_bin(x)))
-            else:
-                preds = torch.concat((preds, model.infer(x)))
+            preds = torch.concat((preds, model.infer(x)))
             true = torch.concat((true, y))
             sens = torch.concat((sens, z))
 
@@ -549,70 +368,8 @@ def test(
             | metrics.separation_metrics(preds, true, sens)
             | metrics.l0d1_loss(preds, true, COST)
         )
-        if isinstance(model, models.FNNC) and model.rho is None:
-            temp = deepcopy(results)
-            results.clear()
-            for key in temp.keys():
-                results[f"fnnc_{key}"] = deepcopy(temp[key])
 
         return results
-
-
-def postprocess(
-    train_dataloader: dataset.MultiEpochsDataLoader, model: models.FNNC
-) -> None:
-    """
-    Simple post-processing algorithm to convert fair binary classifier (FNNC) to
-    binary classifier with abstention option.
-
-    From a set of pre-determined possible values, the rho value which minimizes the
-    l0d1 loss is chosen.
-
-    Args:
-        train_dataloader:
-          Dataloader containing the train samples.
-        model:
-          FNNC model to post-process.
-    """
-
-    if DISABLE_TQDM:
-        print("Started FNNC post-processing", flush=True)
-
-    model.eval()
-    best_loss = math.inf
-    best_rho = None
-
-    with torch.no_grad():
-        for rho in tqdm(
-            np.linspace(0, 1, 161),
-            desc="FNNC postprocessing",
-            leave=False,
-            disable=DISABLE_TQDM,
-        ):
-            if rho == 0 or rho == 1:
-                continue
-            model.rho = rho
-            preds = torch.empty(0, device=DEVICE)
-            true = torch.empty(0, dtype=torch.long, device=DEVICE)
-
-            for batch in tqdm(
-                train_dataloader,
-                desc="Evaluating rho",
-                leave=False,
-                disable=DISABLE_TQDM,
-            ):
-                x, y, _ = batch
-                x = x.to(DEVICE)
-                y = y.to(DEVICE)
-                preds = torch.concat((preds, model.infer(x)))
-                true = torch.concat((true, y))
-
-            loss = metrics.l0d1_loss(preds, true, COST)["l0d1"].item()
-            if loss < best_loss:
-                best_loss = loss
-                best_rho = rho
-
-    model.rho = best_rho
 
 
 def train_one_fold(
@@ -670,33 +427,30 @@ def train_one_fold(
 
     if MODEL == "risan":
         model = models.RISAN().to(DEVICE)
-        model_loss_fn = metrics.DoubleSigmoidLoss(COST, 0.5)
+        model_loss_fn = metrics.DoubleSigmoidLoss(COST, GAMMA)
     elif MODEL == "kp1":
         model = models.KP1().to(DEVICE)
-        model_loss_fn = metrics.GenralizedCrossEntropy(0.7)
-    else:
-        model = models.FNNC().to(DEVICE)
-        model_loss_fn = nn.NLLLoss()
+        model_loss_fn = metrics.GenralizedCrossEntropy(GAMMA)
 
     with torch.no_grad():
         model.eval()
         model(train_dataset[0][0].view(1, -1).to(DEVICE))
         model.train()
-    
-    model_optimizer = torch.optim.Adam(model.parameters(), fused=True)
+
+    model_optimizer = torch.optim.Adam(model.parameters(), fused=True, lr=LR)
 
     if FAIRNESS_CONDITION == "ind":
         fairness_loss_fn = metrics.DemographicParity()
         lambdas = torch.nn.Parameter(torch.zeros(3, device=DEVICE))
-        lambdas_optimizer = torch.optim.Adam([lambdas], fused=True, maximize=True)
+        lambdas_optimizer = torch.optim.Adam([lambdas], fused=True, maximize=True, lr=LR*10)
     elif FAIRNESS_CONDITION == "sep":
         fairness_loss_fn = metrics.EqualizedOdds()
         lambdas = torch.nn.Parameter(torch.zeros(6, device=DEVICE))
-        lambdas_optimizer = torch.optim.Adam([lambdas], fused=True, maximize=True)
+        lambdas_optimizer = torch.optim.Adam([lambdas], fused=True, maximize=True, lr=LR*10)
     elif FAIRNESS_CONDITION == "mixed":
         fairness_loss_fn = metrics.MixedDPandEO()
         lambdas = torch.nn.Parameter(torch.zeros(3, device=DEVICE))
-        lambdas_optimizer = torch.optim.Adam([lambdas], fused=True, maximize=True)
+        lambdas_optimizer = torch.optim.Adam([lambdas], fused=True, maximize=True, lr=LR*10)
     else:
         fairness_loss_fn = None
         lambdas = None
@@ -706,65 +460,50 @@ def train_one_fold(
     best_loss = math.inf
     last_improvement = 0
 
-    if isinstance(model, models.FNNC) and os.path.exists(
-        f"models/{DATASET}/{MODEL}/{FAIRNESS_CONDITION}/{run_num}_{fold_num}.pt"
+    for epoch_num in tqdm(
+        range(EPOCHS), desc="Epochs", leave=False, disable=DISABLE_TQDM
     ):
-        best_model.load_state_dict(
-            torch.load(
-                f"models/{DATASET}/{MODEL}/{FAIRNESS_CONDITION}/{run_num}_{fold_num}.pt"
-            )
+        train_epoch(
+            run_num,
+            fold_num,
+            epoch_num,
+            train_dataloader,
+            model,
+            model_loss_fn,
+            model_optimizer,
+            lambdas,
+            fairness_loss_fn,
+            lambdas_optimizer,
         )
-        best_model.to(DEVICE)
-    else:
-        for epoch_num in tqdm(
-            range(EPOCHS), desc="Epochs", leave=False, disable=DISABLE_TQDM
-        ):
-            train_epoch(
-                run_num,
-                fold_num,
-                epoch_num,
-                train_dataloader,
-                model,
-                model_loss_fn,
-                model_optimizer,
-                lambdas,
-                fairness_loss_fn,
-                lambdas_optimizer,
-            )
 
-            dev_loss = dev_epoch(
-                run_num,
-                fold_num,
-                epoch_num,
-                test_dataloader,
-                model,
-                model_loss_fn,
-                lambdas,
-                fairness_loss_fn,
-            )
+        dev_loss = dev_epoch(
+            run_num,
+            fold_num,
+            epoch_num,
+            test_dataloader,
+            model,
+            model_loss_fn,
+            lambdas,
+            fairness_loss_fn,
+        )
 
-            if dev_loss.item() < best_loss - 1e-3:
-                best_loss = dev_loss.item()
-                best_model = deepcopy(model)
-                last_improvement = 0
-            else:
-                last_improvement += 1
-                if last_improvement == 10:
-                    break
+        if dev_loss.item() < best_loss:
+            best_loss = dev_loss.item()
+            best_model = deepcopy(model)
+            last_improvement = 0
+        else:
+            last_improvement += 1
+            if last_improvement == 10:
+                break
 
     best_model.eval()
     results = test(test_dataloader, best_model)
-    # tsne(run_num, fold_num, test_dataloader, best_model)
     os.makedirs(f"models/{DATASET}/{MODEL}/{FAIRNESS_CONDITION}/", exist_ok=True)
-    if isinstance(best_model, models.FNNC) and best_model.rho is None:
-        torch.save(best_model.state_dict(), f"models/{DATASET}/{MODEL}/{FAIRNESS_CONDITION}/{run_num}_{fold_num}.pt")
-        postprocess(train_dataloader, best_model)
-        torch.save(best_model.state_dict(), f"models/{DATASET}/{MODEL}/{FAIRNESS_CONDITION}/{COST:f}_{run_num}_{fold_num}.pt")
-        # tsne(run_num, fold_num, test_dataloader, best_model)
-        results = results | test(test_dataloader, best_model)
-    else:
-        torch.save(best_model.state_dict(), f"models/{DATASET}/{MODEL}/{FAIRNESS_CONDITION}/{COST:f}_{run_num}_{fold_num}.pt")
-        
+    torch.save(
+        best_model.state_dict(),
+        f"models/{DATASET}/{MODEL}/{FAIRNESS_CONDITION}/{COST:f}_{run_num}_{fold_num}.pt",
+    )
+
     os.makedirs(
         f"outputs/{DATASET}/{MODEL}/{FAIRNESS_CONDITION}/{COST:f}/", exist_ok=True
     )
@@ -772,10 +511,11 @@ def train_one_fold(
     for key in results.keys():
         temp[key] = results[key].tolist()
     with open(
-        f"outputs/{DATASET}/{MODEL}/{FAIRNESS_CONDITION}/{COST:f}/{run_num}_{fold_num}.json", "w"
+        f"outputs/{DATASET}/{MODEL}/{FAIRNESS_CONDITION}/{COST:f}/{run_num}_{fold_num}.json",
+        "w",
     ) as f:
         f.write(json.dumps(temp, indent=4))
-    
+
     return results
 
 

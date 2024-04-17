@@ -2,7 +2,7 @@ from time import sleep
 import shlex
 import subprocess
 
-MAX_JOBS = 2
+MAX_JOBS = 8
 USER = (str(subprocess.run("whoami", stdout=subprocess.PIPE).stdout))[2:-3]
 print(USER)
 

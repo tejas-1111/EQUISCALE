@@ -59,22 +59,6 @@ class RISAN(nn.Module):
             torch.stack([-f - rho, f - rho, rho - torch.abs(f)], dim=1), dim=1
         )
         return r
-    
-    def tsne(self, x: torch.Tensor) -> torch.Tensor:
-        """
-        Returns learnt vectors for TSNE plots.
-
-        Args:
-            x:
-              A tensor of shape (batch_size, num_features) denoting a batch input 
-              to the model.
-
-        Returns:
-            A single tensor of shape (batch_size, 64) denoting the learn features for 
-            samples.
-        """
-
-        return self.fc_1(x)
 
 
 class KP1(nn.Module):
@@ -128,22 +112,6 @@ class KP1(nn.Module):
             of abstention.
         """
         return F.softmax(self.__call__(x), dim=1)
-    
-    def tsne(self, x: torch.Tensor) -> torch.Tensor:
-        """
-        Returns learnt vectors for TSNE plots.
-
-        Args:
-            x:
-              A tensor of shape (batch_size, num_features) denoting a batch input 
-              to the model.
-
-        Returns:
-            A single tensor of shape (batch_size, 64) denoting the learn features for 
-            samples.
-        """
-
-        return self.fc_1(x)
 
 
 class FNNC(nn.Module):
@@ -217,19 +185,3 @@ class FNNC(nn.Module):
         """
         output = (self.__call__(x).flatten() + 1) / 2
         return torch.stack((1 - output, output, torch.zeros_like(output)), dim=1)
-
-    def tsne(self, x: torch.Tensor) -> torch.Tensor:
-        """
-        Returns learnt vectors for TSNE plots.
-
-        Args:
-            x:
-              A tensor of shape (batch_size, num_features) denoting a batch input 
-              to the model.
-
-        Returns:
-            A single tensor of shape (batch_size, 64) denoting the learn features for 
-            samples.
-        """
-
-        return self.fc_1(x)

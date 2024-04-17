@@ -132,7 +132,7 @@ class DemographicParity(nn.Module):
         sens = kwargs["sens"].float()
         group_0_total = (sens == 0).sum() + 1e-18
         group_1_total = (sens == 1).sum() + 1e-18
-        return (
+        return torch.abs(
             (r.T @ (1 - sens) / group_0_total) - (r.T @ sens / group_1_total)
         ).flatten()
 
@@ -172,16 +172,18 @@ class EqualizedOdds(nn.Module):
         group_1_y_0 = ((sens == 1) * (true == 0)).sum() + 1e-18
         group_1_y_1 = ((sens == 1) * (true == 1)).sum() + 1e-18
 
-        p1: torch.Tensor = (r.T @ ((1 - sens) * (1 - true))) / group_0_y_0 - (
-            r.T @ (sens * (1 - true))
-        ) / group_1_y_0
-        p2: torch.Tensor = (r.T @ ((1 - sens) * true)) / group_0_y_1 - (
-            r.T @ (sens * true)
-        ) / group_1_y_1
+        p1 = torch.abs(
+            (r.T @ ((1 - sens) * (1 - true))) / group_0_y_0
+            - (r.T @ (sens * (1 - true))) / group_1_y_0
+        ).flatten()
+        p2 = torch.abs(
+            (r.T @ ((1 - sens) * true)) / group_0_y_1
+            - (r.T @ (sens * true)) / group_1_y_1
+        ).flatten()
 
-        return torch.concat((p1.flatten(), p2.flatten()))
+        return torch.concat((p1, p2))
 
-
+# TODO change to return absolute flatten vector
 class MixedDPandEO(nn.Module):
     """
     Loss function to enforce mixed constraints as proposed in our paper.
