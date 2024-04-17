@@ -52,21 +52,51 @@ WRITER = torch.utils.tensorboard.SummaryWriter(  # type: ignore
     f"runs/{DATASET}/{MODEL}/{FAIRNESS_CONDITION}/{COST}"
 )
 
-GAMMA = 0
-LR = 1e-3
-
 if DATASET == "adult":
     if MODEL == "risan":
-        ...
-    elif MODEL == "kp1":
-        ...
-elif DATASET == "german":
-    if MODEL == "risan":
-        GAMMA = 5.5
-        LR = 1e-3
+        GAMMA = 8
+        LR1 = 1e-3
+        LR2 = 1e-3
     elif MODEL == "kp1":
         GAMMA = 0.7
-        LR = 1e-3
+        LR1 = 1e-3
+        LR2 = 1e-3
+elif DATASET == "bank":
+    if MODEL == "risan":
+        GAMMA = 1
+        LR1 = 1e-3
+        LR2 = 1e-3
+    elif MODEL == "kp1":
+        GAMMA = 0.7
+        LR1 = 1e-3
+        LR2 = 1e-3
+elif DATASET == "compas":
+    if MODEL == "risan":
+        GAMMA = 1
+        LR1 = 1e-2
+        LR2 = 1e-3
+    elif MODEL == "kp1":
+        GAMMA = 0.7
+        LR1 = 1e-3
+        LR2 = 1e-3
+elif DATASET == "default":
+    if MODEL == "risan":
+        GAMMA = 6.8
+        LR1 = 1e-3
+        LR2 = 1e-3
+    elif MODEL == "kp1":
+        GAMMA = 0.7
+        LR1 = 1e-3
+        LR2 = 1e-3
+elif DATASET == "german":
+    if MODEL == "risan":
+        GAMMA = 1.175
+        LR1 = 1e-3
+        LR2 = 1e-3
+    elif MODEL == "kp1":
+        GAMMA = 0.7
+        LR1 = 1e-3
+        LR2 = 1e-3
 
 
 def train_epoch(
@@ -379,7 +409,7 @@ def train_one_fold(
     test_data: npt.NDArray[np.float64],
 ) -> dict[str, torch.Tensor]:
     """
-    Trains one fold of the 10-fold cross-validation.
+    Trains one fold of the 5-fold cross-validation.
 
     Args:
         run_num:
@@ -437,20 +467,20 @@ def train_one_fold(
         model(train_dataset[0][0].view(1, -1).to(DEVICE))
         model.train()
 
-    model_optimizer = torch.optim.Adam(model.parameters(), fused=True, lr=LR)
+    model_optimizer = torch.optim.Adam(model.parameters(), fused=True, lr=LR1)
 
     if FAIRNESS_CONDITION == "ind":
         fairness_loss_fn = metrics.DemographicParity()
         lambdas = torch.nn.Parameter(torch.zeros(3, device=DEVICE))
-        lambdas_optimizer = torch.optim.Adam([lambdas], fused=True, maximize=True, lr=LR*10)
+        lambdas_optimizer = torch.optim.Adam([lambdas], fused=True, maximize=True, lr=LR2)
     elif FAIRNESS_CONDITION == "sep":
         fairness_loss_fn = metrics.EqualizedOdds()
         lambdas = torch.nn.Parameter(torch.zeros(6, device=DEVICE))
-        lambdas_optimizer = torch.optim.Adam([lambdas], fused=True, maximize=True, lr=LR*10)
+        lambdas_optimizer = torch.optim.Adam([lambdas], fused=True, maximize=True, lr=LR2)
     elif FAIRNESS_CONDITION == "mixed":
         fairness_loss_fn = metrics.MixedDPandEO()
         lambdas = torch.nn.Parameter(torch.zeros(3, device=DEVICE))
-        lambdas_optimizer = torch.optim.Adam([lambdas], fused=True, maximize=True, lr=LR*10)
+        lambdas_optimizer = torch.optim.Adam([lambdas], fused=True, maximize=True, lr=LR2)
     else:
         fairness_loss_fn = None
         lambdas = None
@@ -525,7 +555,7 @@ def train_one_run(
     test_data: npt.NDArray[np.float64] | None,
 ) -> dict[str, torch.Tensor]:
     """
-    Completes one run of the ten runs of the model. Uses 10-fold cross-validation
+    Completes one run of the five runs of the model. Uses 5-fold cross-validation
     if test data is not provided.
 
     Args:
@@ -547,9 +577,9 @@ def train_one_run(
     returns = []
     if test_data is None:
         data = train_data.copy()
-        data = np.array_split(data, 10)
+        data = np.array_split(data, 5)
         for fold_num in tqdm(
-            range(10), leave=False, desc="Fold number", disable=DISABLE_TQDM
+            range(5), leave=False, desc="Fold number", disable=DISABLE_TQDM
         ):
             fold_train_data = np.concatenate(data[:fold_num] + data[fold_num + 1 :])
             returns.append(
@@ -599,7 +629,7 @@ def main():
         exit()
 
     returns = []
-    for run_num in tqdm(range(10), desc="Runs", leave=False, disable=DISABLE_TQDM):
+    for run_num in tqdm(range(5), desc="Runs", leave=False, disable=DISABLE_TQDM):
         returns.append(train_one_run(run_num, train_data, test_data))
     WRITER.flush()
 
