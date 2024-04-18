@@ -28,8 +28,20 @@ settings = [
     {
         "model": "RISAN",
         "dataset": "Adult",
+        "fairness_condition": "None",
+        "costs": [0.25],
+    },
+    {
+        "model": "RISAN",
+        "dataset": "Adult",
+        "fairness_condition": "Ind",
+        "costs": [0.25],
+    },
+    {
+        "model": "RISAN",
+        "dataset": "Adult",
         "fairness_condition": "Sep",
-        "costs": [0.20625, 0.2125, 0.21875, 0.225, 0.23125, 0.2375, 0.24375],
+        "costs": [0.25],
     },
 ]
 
@@ -45,7 +57,7 @@ for s in settings:
         cmd = shlex.split(command)
         while len(processes) >= MAX_JOBS:
             processes = list(filter(alive, processes))
-            sleep(5)
+            sleep(1)
         # print(cmd)
         p = subprocess.Popen(
             cmd,
@@ -54,9 +66,9 @@ for s in settings:
             ),
         )
         processes.append(p)
-        sleep(5)
+        sleep(1)
 
 while len(processes) != 0:
     processes = list(filter(alive, processes))
-    sleep(5)
+    sleep(1)
 print("Finished")
