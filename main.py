@@ -54,13 +54,27 @@ WRITER = torch.utils.tensorboard.SummaryWriter(  # type: ignore
 
 if DATASET == "adult":
     if MODEL == "risan":
-        GAMMA = 8
         LR1 = 1e-3
-        LR2 = 1e-3
+        if FAIRNESS_CONDITION == "none":
+            GAMMA = 5.375
+            LR2 = 1e-3
+        elif FAIRNESS_CONDITION == "ind":
+            GAMMA = 1.75
+            LR2 = 1e-3
+        elif FAIRNESS_CONDITION == "sep":
+            GAMMA = 1.25
+            LR2 = 1e-3
     elif MODEL == "kp1":
-        GAMMA = 0.7
         LR1 = 1e-3
-        LR2 = 1e-3
+        if FAIRNESS_CONDITION == "none":
+            GAMMA = 0.1
+            LR2 = 1e-3
+        elif FAIRNESS_CONDITION == "ind":
+            GAMMA = 0.1
+            LR2 = 1e-3
+        elif FAIRNESS_CONDITION == "sep":
+            GAMMA = 0.1
+            LR2 = 1e-3
 elif DATASET == "bank":
     if MODEL == "risan":
         GAMMA = 1
@@ -89,12 +103,12 @@ elif DATASET == "default":
         LR1 = 1e-3
         LR2 = 1e-3
 elif DATASET == "german":
-    if MODEL == "risan":
-        GAMMA = 1.175
+    if MODEL == "risan":  
+        GAMMA = 1.175 # Done
         LR1 = 1e-3
         LR2 = 1e-3
     elif MODEL == "kp1":
-        GAMMA = 0.7
+        GAMMA = 0.85   # Done
         LR1 = 1e-3
         LR2 = 1e-3
 
@@ -472,15 +486,21 @@ def train_one_fold(
     if FAIRNESS_CONDITION == "ind":
         fairness_loss_fn = metrics.DemographicParity()
         lambdas = torch.nn.Parameter(torch.zeros(3, device=DEVICE))
-        lambdas_optimizer = torch.optim.Adam([lambdas], fused=True, maximize=True, lr=LR2)
+        lambdas_optimizer = torch.optim.Adam(
+            [lambdas], fused=True, maximize=True, lr=LR2
+        )
     elif FAIRNESS_CONDITION == "sep":
         fairness_loss_fn = metrics.EqualizedOdds()
         lambdas = torch.nn.Parameter(torch.zeros(6, device=DEVICE))
-        lambdas_optimizer = torch.optim.Adam([lambdas], fused=True, maximize=True, lr=LR2)
+        lambdas_optimizer = torch.optim.Adam(
+            [lambdas], fused=True, maximize=True, lr=LR2
+        )
     elif FAIRNESS_CONDITION == "mixed":
         fairness_loss_fn = metrics.MixedDPandEO()
         lambdas = torch.nn.Parameter(torch.zeros(3, device=DEVICE))
-        lambdas_optimizer = torch.optim.Adam([lambdas], fused=True, maximize=True, lr=LR2)
+        lambdas_optimizer = torch.optim.Adam(
+            [lambdas], fused=True, maximize=True, lr=LR2
+        )
     else:
         fairness_loss_fn = None
         lambdas = None
