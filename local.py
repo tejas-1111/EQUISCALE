@@ -2,7 +2,7 @@ from time import sleep
 import shlex
 import subprocess
 
-MAX_JOBS = 6
+MAX_JOBS = 8
 USER = (str(subprocess.run("whoami", stdout=subprocess.PIPE).stdout))[2:-3]
 print(USER)
 
@@ -25,150 +25,41 @@ print(USER)
 # },
 
 settings = [
-    # {
-    #     "model": "RISAN",
-    #     "dataset": "Bank",
-    #     "fairness_condition": "None",
-    #     "costs": [0.25],
-    # },
-    # {
-    #     "model": "RISAN",
-    #     "dataset": "Bank",
-    #     "fairness_condition": "Ind",
-    #     "costs": [0.25],
-    # },
-    # {
-    #     "model": "RISAN",
-    #     "dataset": "Bank",
-    #     "fairness_condition": "Sep",
-    #     "costs": [0.25],
-    # },
-    # {
-    #     "model": "KP1",
-    #     "dataset": "Bank",
-    #     "fairness_condition": "None",
-    #     "costs": [0.25],
-    # },
-    # {
-    #     "model": "KP1",
-    #     "dataset": "Bank",
-    #     "fairness_condition": "Ind",
-    #     "costs": [0.25],
-    # },
-    # {
-    #     "model": "KP1",
-    #     "dataset": "Bank",
-    #     "fairness_condition": "Sep",
-    #     "costs": [0.25],
-    # },
-
-    # {
-    #     "model": "RISAN",
-    #     "dataset": "Compas",
-    #     "fairness_condition": "None",
-    #     "costs": [0.25],
-    # },
-    # {
-    #     "model": "RISAN",
-    #     "dataset": "Compas",
-    #     "fairness_condition": "Ind",
-    #     "costs": [0.25],
-    # },
-    # {
-    #     "model": "RISAN",
-    #     "dataset": "Compas",
-    #     "fairness_condition": "Sep",
-    #     "costs": [0.25],
-    # },
-    # {
-    #     "model": "KP1",
-    #     "dataset": "Compas",
-    #     "fairness_condition": "None",
-    #     "costs": [0.25],
-    # },
-    # {
-    #     "model": "KP1",
-    #     "dataset": "Compas",
-    #     "fairness_condition": "Ind",
-    #     "costs": [0.25],
-    # },
-    # {
-    #     "model": "KP1",
-    #     "dataset": "Compas",
-    #     "fairness_condition": "Sep",
-    #     "costs": [0.25],
-    # },
-
-    # {
-    #     "model": "RISAN",
-    #     "dataset": "Default",
-    #     "fairness_condition": "None",
-    #     "costs": [0.25],
-    # },
-    # {
-    #     "model": "RISAN",
-    #     "dataset": "Default",
-    #     "fairness_condition": "Ind",
-    #     "costs": [0.25],
-    # },
-    # {
-    #     "model": "RISAN",
-    #     "dataset": "Default",
-    #     "fairness_condition": "Sep",
-    #     "costs": [0.25],
-    # },
-    # {
-    #     "model": "KP1",
-    #     "dataset": "Default",
-    #     "fairness_condition": "None",
-    #     "costs": [0.25],
-    # },
-    # {
-    #     "model": "KP1",
-    #     "dataset": "Default",
-    #     "fairness_condition": "Ind",
-    #     "costs": [0.25],
-    # },
-    # {
-    #     "model": "KP1",
-    #     "dataset": "Default",
-    #     "fairness_condition": "Sep",
-    #     "costs": [0.25],
-    # },
-
     {
         "model": "RISAN",
-        "dataset": "German",
+        "dataset": "Bank",
         "fairness_condition": "None",
         "costs": [0.25],
     },
     {
         "model": "RISAN",
-        "dataset": "German",
+        "dataset": "Bank",
         "fairness_condition": "Ind",
         "costs": [0.25],
     },
     {
         "model": "RISAN",
-        "dataset": "German",
+        "dataset": "Bank",
         "fairness_condition": "Sep",
         "costs": [0.25],
     },
+
+
     {
         "model": "KP1",
-        "dataset": "German",
+        "dataset": "Bank",
         "fairness_condition": "None",
         "costs": [0.25],
     },
     {
         "model": "KP1",
-        "dataset": "German",
+        "dataset": "Bank",
         "fairness_condition": "Ind",
         "costs": [0.25],
     },
     {
         "model": "KP1",
-        "dataset": "German",
+        "dataset": "Bank",
         "fairness_condition": "Sep",
         "costs": [0.25],
     },

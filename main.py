@@ -64,6 +64,9 @@ if DATASET == "adult":
         elif FAIRNESS_CONDITION == "sep":
             GAMMA = 1.25
             LR2 = 0.001
+        elif FAIRNESS_CONDITION == "mixed":
+            GAMMA = 1
+            LR2 = 0.01
     elif MODEL == "kp1":
         LR1 = 0.001
         if FAIRNESS_CONDITION == "none":
@@ -75,6 +78,9 @@ if DATASET == "adult":
         elif FAIRNESS_CONDITION == "sep":
             GAMMA = 0.1
             LR2 = 0.005
+        elif FAIRNESS_CONDITION == "mixed":
+            GAMMA = 0.1
+            LR2 = 0.01
 elif DATASET == "bank":
     if MODEL == "risan":
         LR1 = 0.001
@@ -151,10 +157,10 @@ elif DATASET == "german":
             GAMMA = 1.175
             LR2 = 0.001
         elif FAIRNESS_CONDITION == "ind":
-            GAMMA = 1
+            GAMMA = 0.9
             LR2 = 0.001
         elif FAIRNESS_CONDITION == "sep":
-            GAMMA = 1
+            GAMMA = 0.7375
             LR2 = 0.001
     elif MODEL == "kp1":
         LR1 = 0.001
@@ -162,10 +168,10 @@ elif DATASET == "german":
             GAMMA = 0.85
             LR2 = 0.001
         elif FAIRNESS_CONDITION == "ind":
-            GAMMA = 0.7
+            GAMMA = 0.85
             LR2 = 0.001
         elif FAIRNESS_CONDITION == "sep":
-            GAMMA = 0.7
+            GAMMA = 0.85
             LR2 = 0.001
 
 

@@ -183,7 +183,7 @@ class EqualizedOdds(nn.Module):
 
         return torch.concat((p1, p2))
 
-# TODO change to return absolute flatten vector
+
 class MixedDPandEO(nn.Module):
     """
     Loss function to enforce mixed constraints as proposed in our paper.
@@ -225,15 +225,19 @@ class MixedDPandEO(nn.Module):
         group_1_y_0 = ((sens == 1) * (true == 0)).sum() + 1e-18
         group_1_y_1 = ((sens == 1) * (true == 1)).sum() + 1e-18
 
-        pos = (r[:, 1] @ (1 - sens)) / group_0_total - (r[:, 1] @ sens) / group_1_total
-        tnr = (r[:, 0] @ ((1 - sens) * (1 - true))) / group_0_y_0 - (
-            r[:, 0] @ (sens * (1 - true))
-        ) / group_1_y_0
-        fnr = (r[:, 0] @ ((1 - sens) * true)) / group_0_y_1 - (
-            r[:, 0] @ (sens * true)
-        ) / group_1_y_1
+        pos = torch.abs(
+            (r[:, 1] @ (1 - sens)) / group_0_total - (r[:, 1] @ sens) / group_1_total
+        ).flatten()
+        tnr = torch.abs(
+            (r[:, 0] @ ((1 - sens) * (1 - true))) / group_0_y_0
+            - (r[:, 0] @ (sens * (1 - true))) / group_1_y_0
+        ).flatten()
+        fnr = torch.abs(
+            (r[:, 0] @ ((1 - sens) * true)) / group_0_y_1
+            - (r[:, 0] @ (sens * true)) / group_1_y_1
+        ).flatten()
 
-        return torch.concat((pos.flatten(), tnr.flatten(), fnr.flatten()))
+        return torch.concat((pos, tnr, fnr))
 
 
 def coverage(pred: torch.Tensor) -> dict[str, torch.Tensor]:
