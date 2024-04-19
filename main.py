@@ -54,63 +54,119 @@ WRITER = torch.utils.tensorboard.SummaryWriter(  # type: ignore
 
 if DATASET == "adult":
     if MODEL == "risan":
-        LR1 = 1e-3
+        LR1 = 0.001
         if FAIRNESS_CONDITION == "none":
             GAMMA = 5.375
-            LR2 = 1e-3
+            LR2 = 0.001
         elif FAIRNESS_CONDITION == "ind":
             GAMMA = 1.75
-            LR2 = 1e-3
+            LR2 = 0.001
         elif FAIRNESS_CONDITION == "sep":
             GAMMA = 1.25
-            LR2 = 1e-3
+            LR2 = 0.001
     elif MODEL == "kp1":
-        LR1 = 1e-3
+        LR1 = 0.001
         if FAIRNESS_CONDITION == "none":
             GAMMA = 0.1
-            LR2 = 1e-3
+            LR2 = 0.001
         elif FAIRNESS_CONDITION == "ind":
             GAMMA = 0.1
-            LR2 = 1e-3
+            LR2 = 0.001
         elif FAIRNESS_CONDITION == "sep":
             GAMMA = 0.1
-            LR2 = 1e-3
+            LR2 = 0.005
 elif DATASET == "bank":
     if MODEL == "risan":
-        GAMMA = 1
-        LR1 = 1e-3
-        LR2 = 1e-3
+        LR1 = 0.001
+        if FAIRNESS_CONDITION == "none":
+            GAMMA = 1
+            LR2 = 0.001
+        elif FAIRNESS_CONDITION == "ind":
+            GAMMA = 1
+            LR2 = 0.001
+        elif FAIRNESS_CONDITION == "sep":
+            GAMMA = 1
+            LR2 = 0.001
     elif MODEL == "kp1":
-        GAMMA = 0.7
-        LR1 = 1e-3
-        LR2 = 1e-3
+        LR1 = 0.001
+        if FAIRNESS_CONDITION == "none":
+            GAMMA = 0.7
+            LR2 = 0.001
+        elif FAIRNESS_CONDITION == "ind":
+            GAMMA = 0.7
+            LR2 = 0.001
+        elif FAIRNESS_CONDITION == "sep":
+            GAMMA = 0.7
+            LR2 = 0.001
 elif DATASET == "compas":
     if MODEL == "risan":
-        GAMMA = 1
-        LR1 = 1e-2
-        LR2 = 1e-3
+        LR1 = 0.01
+        if FAIRNESS_CONDITION == "none":
+            GAMMA = 1
+            LR2 = 0.001
+        elif FAIRNESS_CONDITION == "ind":
+            GAMMA = 1
+            LR2 = 0.001
+        elif FAIRNESS_CONDITION == "sep":
+            GAMMA = 1
+            LR2 = 0.001
     elif MODEL == "kp1":
-        GAMMA = 0.7
-        LR1 = 1e-3
-        LR2 = 1e-3
+        LR1 = 0.001
+        if FAIRNESS_CONDITION == "none":
+            GAMMA = 0.7
+            LR2 = 0.001
+        elif FAIRNESS_CONDITION == "ind":
+            GAMMA = 0.7
+            LR2 = 0.001
+        elif FAIRNESS_CONDITION == "sep":
+            GAMMA = 0.7
+            LR2 = 0.001
 elif DATASET == "default":
     if MODEL == "risan":
-        GAMMA = 6.8
-        LR1 = 1e-3
-        LR2 = 1e-3
+        LR1 = 0.001
+        if FAIRNESS_CONDITION == "none":
+            GAMMA = 1.
+            LR2 = 0.001
+        elif FAIRNESS_CONDITION == "ind":
+            GAMMA = 1
+            LR2 = 0.001
+        elif FAIRNESS_CONDITION == "sep":
+            GAMMA = 1
+            LR2 = 0.001
     elif MODEL == "kp1":
-        GAMMA = 0.7
-        LR1 = 1e-3
-        LR2 = 1e-3
+        LR1 = 0.001
+        if FAIRNESS_CONDITION == "none":
+            GAMMA = 0.7
+            LR2 = 0.001
+        elif FAIRNESS_CONDITION == "ind":
+            GAMMA = 0.7
+            LR2 = 0.001
+        elif FAIRNESS_CONDITION == "sep":
+            GAMMA = 0.7
+            LR2 = 0.001
 elif DATASET == "german":
-    if MODEL == "risan":  
-        GAMMA = 1.175 # Done
-        LR1 = 1e-3
-        LR2 = 1e-3
+    if MODEL == "risan":
+        LR1 = 0.001
+        if FAIRNESS_CONDITION == "none":
+            GAMMA = 1.175
+            LR2 = 0.001
+        elif FAIRNESS_CONDITION == "ind":
+            GAMMA = 1
+            LR2 = 0.001
+        elif FAIRNESS_CONDITION == "sep":
+            GAMMA = 1
+            LR2 = 0.001
     elif MODEL == "kp1":
-        GAMMA = 0.85   # Done
-        LR1 = 1e-3
-        LR2 = 1e-3
+        LR1 = 0.001
+        if FAIRNESS_CONDITION == "none":
+            GAMMA = 0.85
+            LR2 = 0.001
+        elif FAIRNESS_CONDITION == "ind":
+            GAMMA = 0.7
+            LR2 = 0.001
+        elif FAIRNESS_CONDITION == "sep":
+            GAMMA = 0.7
+            LR2 = 0.001
 
 
 def train_epoch(
