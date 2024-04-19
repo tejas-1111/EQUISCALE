@@ -71,7 +71,7 @@ if DATASET == "adult":
             LR2 = 0.001
         elif FAIRNESS_CONDITION == "ind":
             GAMMA = 0.1
-            LR2 = 0.001
+            LR2 = 0.01
         elif FAIRNESS_CONDITION == "sep":
             GAMMA = 0.1
             LR2 = 0.005
