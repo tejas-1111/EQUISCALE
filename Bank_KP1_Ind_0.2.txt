@@ -1,0 +1,56 @@
+kp1: DATASET=bank, FAIR_COND = ind, COST=0.2, DEVICE=cuda
+Run number 0 started
+Fold number 0 started
+Started testing
+Fold number 1 started
+Started testing
+Fold number 2 started
+Started testing
+Fold number 3 started
+Started testing
+Fold number 4 started
+Started testing
+Run number 1 started
+Fold number 0 started
+Started testing
+Fold number 1 started
+Started testing
+Fold number 2 started
+Started testing
+Fold number 3 started
+Started testing
+Fold number 4 started
+Started testing
+Run number 2 started
+Fold number 0 started
+Started testing
+Fold number 1 started
+Started testing
+Fold number 2 started
+Started testing
+Fold number 3 started
+Started testing
+Fold number 4 started
+Started testing
+Run number 3 started
+Fold number 0 started
+Started testing
+Fold number 1 started
+Started testing
+Fold number 2 started
+Started testing
+Fold number 3 started
+Started testing
+Fold number 4 started
+Started testing
+Run number 4 started
+Fold number 0 started
+Started testing
+Fold number 1 started
+Started testing
+Fold number 2 started
+Started testing
+Fold number 3 started
+Started testing
+Fold number 4 started
+Started testing

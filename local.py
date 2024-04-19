@@ -25,43 +25,43 @@ print(USER)
 # },
 
 settings = [
-    {
-        "model": "RISAN",
-        "dataset": "Bank",
-        "fairness_condition": "None",
-        "costs": [0.25],
-    },
-    {
-        "model": "RISAN",
-        "dataset": "Bank",
-        "fairness_condition": "Ind",
-        "costs": [0.25],
-    },
-    {
-        "model": "RISAN",
-        "dataset": "Bank",
-        "fairness_condition": "Sep",
-        "costs": [0.25],
-    },
+    # {
+    #     "model": "RISAN",
+    #     "dataset": "Bank",
+    #     "fairness_condition": "None",
+    #     "costs": [0.25],
+    # },
+    # {
+    #     "model": "RISAN",
+    #     "dataset": "Bank",
+    #     "fairness_condition": "Ind",
+    #     "costs": [0.25],
+    # },
+    # {
+    #     "model": "RISAN",
+    #     "dataset": "Bank",
+    #     "fairness_condition": "Sep",
+    #     "costs": [0.25],
+    # },
 
 
     {
         "model": "KP1",
         "dataset": "Bank",
         "fairness_condition": "None",
-        "costs": [0.25],
+        "costs": [0.1],
     },
     {
         "model": "KP1",
         "dataset": "Bank",
         "fairness_condition": "Ind",
-        "costs": [0.25],
+        "costs": [0.1],
     },
     {
         "model": "KP1",
         "dataset": "Bank",
         "fairness_condition": "Sep",
-        "costs": [0.25],
+        "costs": [0.1],
     },
 ]
 

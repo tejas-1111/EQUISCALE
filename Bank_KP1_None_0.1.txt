@@ -1,0 +1,16 @@
+kp1: DATASET=bank, FAIR_COND = none, COST=0.1, DEVICE=cuda
+Run number 0 started
+Fold number 0 started
+Started testing
+Fold number 1 started
+Started testing
+Fold number 2 started
+Started testing
+Fold number 3 started
+Started testing
+Fold number 4 started
+Started testing
+Run number 1 started
+Fold number 0 started
+Started testing
+Fold number 1 started
