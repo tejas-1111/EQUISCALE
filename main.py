@@ -108,25 +108,26 @@ elif DATASET == "compas":
     if MODEL == "risan":
         LR1 = 0.01
         if FAIRNESS_CONDITION == "none":
-            GAMMA = 1
+            GAMMA = 0.0575
             LR2 = 0.001
         elif FAIRNESS_CONDITION == "ind":
-            GAMMA = 1
+            GAMMA = 0.195
             LR2 = 0.001
         elif FAIRNESS_CONDITION == "sep":
-            GAMMA = 1
-            LR2 = 0.001
+            GAMMA = 0.35
+            LR2 = 0.005
     elif MODEL == "kp1":
-        LR1 = 0.001
+        LR1 = 0.01
         if FAIRNESS_CONDITION == "none":
             GAMMA = 0.7
             LR2 = 0.001
         elif FAIRNESS_CONDITION == "ind":
             GAMMA = 0.7
-            LR2 = 0.001
+            LR2 = 0.01
         elif FAIRNESS_CONDITION == "sep":
+            LR1 = 0.001
             GAMMA = 0.7
-            LR2 = 0.001
+            LR2 = 0.01
 elif DATASET == "default":
     if MODEL == "risan":
         LR1 = 0.001
@@ -599,7 +600,7 @@ def train_one_fold(
             fairness_loss_fn,
         )
 
-        if dev_loss.item() < best_loss:
+        if dev_loss.item() < best_loss - 1e-3:
             best_loss = dev_loss.item()
             best_model = deepcopy(model)
             last_improvement = 0

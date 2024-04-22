@@ -27,41 +27,39 @@ print(USER)
 settings = [
     # {
     #     "model": "RISAN",
-    #     "dataset": "Bank",
+    #     "dataset": "Compas",
     #     "fairness_condition": "None",
     #     "costs": [0.25],
     # },
     # {
     #     "model": "RISAN",
-    #     "dataset": "Bank",
+    #     "dataset": "Compas",
     #     "fairness_condition": "Ind",
     #     "costs": [0.25],
     # },
     # {
     #     "model": "RISAN",
-    #     "dataset": "Bank",
+    #     "dataset": "Compas",
     #     "fairness_condition": "Sep",
     #     "costs": [0.25],
     # },
-
-
+    # {
+    #     "model": "KP1",
+    #     "dataset": "Compas",
+    #     "fairness_condition": "None",
+    #     "costs": [0.38125, 0.3875, 0.39375, 0.45, 0.45625, 0.4625, 0.46875, 0.475, 0.48125, 0.4875, 0.49375],
+    # },
+    # {
+    #     "model": "KP1",
+    #     "dataset": "Compas",
+    #     "fairness_condition": "Ind",
+    #     "costs": [0.38125, 0.3875, 0.39375, 0.45, 0.45625, 0.4625, 0.46875, 0.475, 0.48125, 0.4875, 0.49375],
+    # },
     {
         "model": "KP1",
-        "dataset": "Bank",
-        "fairness_condition": "None",
-        "costs": [0.1],
-    },
-    {
-        "model": "KP1",
-        "dataset": "Bank",
-        "fairness_condition": "Ind",
-        "costs": [0.1],
-    },
-    {
-        "model": "KP1",
-        "dataset": "Bank",
+        "dataset": "Compas",
         "fairness_condition": "Sep",
-        "costs": [0.1],
+        "costs": [0.40625, 0.4125, 0.41875, 0.425, 0.43125, 0.4375, 0.44375, 0.45, 0.45625, 0.4625, 0.46875, 0.475, 0.48125, 0.4875, 0.49375],
     },
 ]
 
