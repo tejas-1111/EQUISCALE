@@ -16,51 +16,88 @@ print(USER)
 # Values used to search
 # 0.00625, 0.03125, 0.05625, 0.08125, 0.10625, 0.13125, 0.15625, 0.18125, 0.20625, 0.23125, 0.25625, 0.28125, 0.30625, 0.33125, 0.35625, 0.38125, 0.40625, 0.43125, 0.45625, 0.48125
 
-# Entry in setting should be of the form:
-# {
-#         "model": "RISAN",
-#         "dataset": "Compas",
-#         "fairness_condition": "Sep",
-#         "costs": [0.10625, 0.13125],
-# },
-
 settings = [
     # {
     #     "model": "RISAN",
-    #     "dataset": "Compas",
+    #     "dataset": "Adult",
     #     "fairness_condition": "None",
-    #     "costs": [0.25],
+    #     "cost0": [0.125, 0.13125, 0.1375, 0.14375],
+    #     "cost1": [0.125, 0.13125, 0.1375, 0.14375],
+    #     "lr1": 1e-3,
+    #     "lr2": 1e-3,
+    #     "gamma": 1,
     # },
     # {
     #     "model": "RISAN",
-    #     "dataset": "Compas",
+    #     "dataset": "Adult",
     #     "fairness_condition": "Ind",
-    #     "costs": [0.25],
+    #     "cost0": [0.175, 0.18125, 0.1875, 0.19375],
+    #     "cost1": [0.175, 0.18125, 0.1875, 0.19375],
+    #     "lr1": 1e-3,
+    #     "lr2": 1e-3,
+    #     "gamma": 1,
     # },
     # {
     #     "model": "RISAN",
-    #     "dataset": "Compas",
+    #     "dataset": "Adult",
     #     "fairness_condition": "Sep",
-    #     "costs": [0.25],
+    #     "cost0": [ 0.44375, 0.45],
+    #     "cost1": [ 0.44375, 0.45],
+    #     "lr1": 1e-3,
+    #     "lr2": 3e-3,
+    #     "gamma": 1,
     # },
     # {
-    #     "model": "KP1",
-    #     "dataset": "Compas",
-    #     "fairness_condition": "None",
-    #     "costs": [0.38125, 0.3875, 0.39375, 0.45, 0.45625, 0.4625, 0.46875, 0.475, 0.48125, 0.4875, 0.49375],
+    #     "model": "RISAN",
+    #     "dataset": "Adult",
+    #     "fairness_condition": "Mixed",
+    #     "cost0": [0.275, 0.28125, 0.2875, 0.29375],
+    #     "cost1": [0.275, 0.28125, 0.2875, 0.29375],
+    #     "lr1": 8e-3,
+    #     "lr2": 4e-3,
+    #     "gamma": 1,
     # },
-    # {
-    #     "model": "KP1",
-    #     "dataset": "Compas",
-    #     "fairness_condition": "Ind",
-    #     "costs": [0.38125, 0.3875, 0.39375, 0.45, 0.45625, 0.4625, 0.46875, 0.475, 0.48125, 0.4875, 0.49375],
-    # },
+
     {
         "model": "KP1",
-        "dataset": "Compas",
-        "fairness_condition": "Sep",
-        "costs": [0.40625, 0.4125, 0.41875, 0.425, 0.43125, 0.4375, 0.44375, 0.45, 0.45625, 0.4625, 0.46875, 0.475, 0.48125, 0.4875, 0.49375],
+        "dataset": "Adult",
+        "fairness_condition": "None",
+        "cost0": [0.15625, 0.38125, 0.3875, 0.39375, 0.4],
+        "cost1": [0.15625, 0.38125, 0.3875, 0.39375, 0.4],
+        "lr1": 1e-3,
+        "lr2": 1e-3,
+        "gamma": 1,
     },
+    # {
+    #     "model": "KP1",
+    #     "dataset": "Adult",
+    #     "fairness_condition": "Ind",
+    #     "cost0": [0.20625, 0.2125, 0.21875, 0.225],
+    #     "cost1": [0.20625, 0.2125, 0.21875, 0.225],
+    #     "lr1": 1e-3,
+    #     "lr2": 5e-3,
+    #     "gamma": 1,
+    # },
+    # {
+    #     "model": "KP1",
+    #     "dataset": "Adult",
+    #     "fairness_condition": "Sep",
+    #     "cost0": [0.30625, 0.3125, 0.31875, 0.325],
+    #     "cost1": [0.30625, 0.3125, 0.31875, 0.325],
+    #     "lr1": 5e-3,
+    #     "lr2": 5e-3,
+    #     "gamma": 1,
+    # },
+    # {
+    #     "model": "KP1",
+    #     "dataset": "Adult",
+    #     "fairness_condition": "Mixed",
+    #     "cost0": [0.3125, 0.31875, 0.325, 0.33125],
+    #     "cost1": [0.3125, 0.31875, 0.325, 0.33125],
+    #     "lr1": 1e-3,
+    #     "lr2": 5e-3,
+    #     "gamma": 1,
+    # },
 ]
 
 
@@ -70,17 +107,17 @@ def alive(x):
 
 processes = []
 for s in settings:
-    for c in s["costs"]:
-        command = f"python -Wi main.py --dataset {s['dataset']} --model {s['model']} --fairness_condition {s['fairness_condition']} --cost {c} --tqdm No"
+    for c0, c1 in zip(s["cost0"], s["cost1"]):
+        command = f"python -Wi main.py --dataset {s['dataset']} --model {s['model']} --fairness_condition {s['fairness_condition']} --cost_0 {c0} --cost_1 {c1} --lr1 {s['lr1']} --lr2 {s['lr2']} --gamma {s['gamma']} --tqdm No"
         cmd = shlex.split(command)
         while len(processes) >= MAX_JOBS:
             processes = list(filter(alive, processes))
             sleep(1)
-        # print(cmd)
         p = subprocess.Popen(
             cmd,
             stdout=open(
-                f"{s['dataset']}_{s['model']}_{s['fairness_condition']}_{c}.txt", "w"
+                f"{s['dataset']}_{s['model']}_{s['fairness_condition']}_{c0}_{c1}.txt",
+                "w",
             ),
         )
         processes.append(p)

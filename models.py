@@ -12,7 +12,7 @@ class RISAN(nn.Module):
     def __init__(self) -> None:
         super().__init__()
 
-        self.fc_1 = nn.LazyLinear(64)
+        self.fc_1 = nn.LazyLinear(32)
         self.b_1 = nn.LazyBatchNorm1d()
         self.d_1 = nn.Dropout1d()
         self.f = nn.LazyLinear(1)
@@ -71,7 +71,7 @@ class KP1(nn.Module):
     def __init__(self):
         super().__init__()
 
-        self.fc_1 = nn.LazyLinear(64)
+        self.fc_1 = nn.LazyLinear(32)
         self.b_1 = nn.LazyBatchNorm1d()
         self.d_1 = nn.Dropout1d()
         self.out = nn.LazyLinear(3)

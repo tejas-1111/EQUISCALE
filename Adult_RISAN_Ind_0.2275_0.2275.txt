@@ -1,0 +1,16 @@
+risan: DATASET=adult, FAIR_COND = ind, COST_0=0.2275, COST_1=0.2275, DEVICE=cuda
+Run number 0 started
+Fold number 0 started
+Started testing
+Run number 1 started
+Fold number 0 started
+Started testing
+Run number 2 started
+Fold number 0 started
+Started testing
+Run number 3 started
+Fold number 0 started
+Started testing
+Run number 4 started
+Fold number 0 started
+Started testing

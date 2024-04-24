@@ -27,13 +27,17 @@ parser.add_argument(
     choices=["None", "Ind", "Sep", "Mixed"],
     required=True,
 )
-parser.add_argument("--cost", type=float, required=True)
+parser.add_argument("--cost_0", type=float, required=True)
+parser.add_argument("--cost_1", type=float, required=True)
 parser.add_argument(
     "--dataset",
     type=str,
     choices=["Adult", "Bank", "Compas", "Default", "German"],
     required=True,
 )
+parser.add_argument("--gamma", type=float, required=True)
+parser.add_argument("--lr1", type=float, required=True)
+parser.add_argument("--lr2", type=float, required=True)
 parser.add_argument("--tqdm", type=str, choices=["Yes", "No"], required=True)
 
 args = parser.parse_args()
@@ -45,135 +49,16 @@ if DATASET == "german" or DATASET == "compas":
     BATCH_SIZE: int = 256
 else:
     BATCH_SIZE: int = 2048
-COST: float = float(args.cost)
+COST_0: float = float(args.cost_0)
+COST_1: float = float(args.cost_1)
+GAMMA: float = float(args.gamma)
+LR1: float = float(args.lr1)
+LR2: float = float(args.lr2)
 DISABLE_TQDM = False if args.tqdm == "Yes" else True
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 WRITER = torch.utils.tensorboard.SummaryWriter(  # type: ignore
-    f"runs/{DATASET}/{MODEL}/{FAIRNESS_CONDITION}/{COST}"
+    f"runs/{DATASET}/{MODEL}/{FAIRNESS_CONDITION}/{COST_0}_{COST_1}"
 )
-
-if DATASET == "adult":
-    if MODEL == "risan":
-        LR1 = 0.001
-        if FAIRNESS_CONDITION == "none":
-            GAMMA = 5.375
-            LR2 = 0.001
-        elif FAIRNESS_CONDITION == "ind":
-            GAMMA = 1.75
-            LR2 = 0.001
-        elif FAIRNESS_CONDITION == "sep":
-            GAMMA = 1.25
-            LR2 = 0.001
-        # elif FAIRNESS_CONDITION == "mixed":
-        #     GAMMA = 1
-        #     LR2 = 0.01
-    elif MODEL == "kp1":
-        LR1 = 0.001
-        if FAIRNESS_CONDITION == "none":
-            GAMMA = 0.1
-            LR2 = 0.001
-        elif FAIRNESS_CONDITION == "ind":
-            GAMMA = 0.1
-            LR2 = 0.01
-        elif FAIRNESS_CONDITION == "sep":
-            GAMMA = 0.1
-            LR2 = 0.005
-        # elif FAIRNESS_CONDITION == "mixed":
-        #     GAMMA = 0.1
-        #     LR2 = 0.01
-elif DATASET == "bank":
-    if MODEL == "risan":
-        LR1 = 0.05
-        if FAIRNESS_CONDITION == "none":
-            GAMMA = 1
-            LR2 = 0.0001
-        elif FAIRNESS_CONDITION == "ind":
-            GAMMA = 1
-            LR2 = 0.0001
-        elif FAIRNESS_CONDITION == "sep":
-            GAMMA = 1
-            LR2 = 0.0005
-    elif MODEL == "kp1":
-        LR1 = 0.01
-        if FAIRNESS_CONDITION == "none":
-            GAMMA = 0.7
-            LR2 = 0.0001
-        elif FAIRNESS_CONDITION == "ind":
-            GAMMA = 0.7
-            LR2 = 0.0001
-        elif FAIRNESS_CONDITION == "sep":
-            GAMMA = 0.7
-            LR2 = 0.0001
-elif DATASET == "compas":
-    if MODEL == "risan":
-        LR1 = 0.01
-        if FAIRNESS_CONDITION == "none":
-            GAMMA = 0.0575
-            LR2 = 0.001
-        elif FAIRNESS_CONDITION == "ind":
-            GAMMA = 0.195
-            LR2 = 0.001
-        elif FAIRNESS_CONDITION == "sep":
-            GAMMA = 0.35
-            LR2 = 0.005
-    elif MODEL == "kp1":
-        LR1 = 0.01
-        if FAIRNESS_CONDITION == "none":
-            GAMMA = 0.7
-            LR2 = 0.001
-        elif FAIRNESS_CONDITION == "ind":
-            GAMMA = 0.7
-            LR2 = 0.01
-        elif FAIRNESS_CONDITION == "sep":
-            LR1 = 0.001
-            GAMMA = 0.7
-            LR2 = 0.01
-elif DATASET == "default":
-    if MODEL == "risan":
-        LR1 = 0.001
-        if FAIRNESS_CONDITION == "none":
-            GAMMA = 1.
-            LR2 = 0.001
-        elif FAIRNESS_CONDITION == "ind":
-            GAMMA = 1
-            LR2 = 0.001
-        elif FAIRNESS_CONDITION == "sep":
-            GAMMA = 1
-            LR2 = 0.001
-    elif MODEL == "kp1":
-        LR1 = 0.001
-        if FAIRNESS_CONDITION == "none":
-            GAMMA = 0.7
-            LR2 = 0.001
-        elif FAIRNESS_CONDITION == "ind":
-            GAMMA = 0.7
-            LR2 = 0.001
-        elif FAIRNESS_CONDITION == "sep":
-            GAMMA = 0.7
-            LR2 = 0.001
-elif DATASET == "german":
-    if MODEL == "risan":
-        LR1 = 0.001
-        if FAIRNESS_CONDITION == "none":
-            GAMMA = 1.175
-            LR2 = 0.001
-        elif FAIRNESS_CONDITION == "ind":
-            GAMMA = 0.9
-            LR2 = 0.001
-        elif FAIRNESS_CONDITION == "sep":
-            GAMMA = 0.7375
-            LR2 = 0.001
-    elif MODEL == "kp1":
-        LR1 = 0.001
-        if FAIRNESS_CONDITION == "none":
-            GAMMA = 0.85
-            LR2 = 0.001
-        elif FAIRNESS_CONDITION == "ind":
-            GAMMA = 0.85
-            LR2 = 0.001
-        elif FAIRNESS_CONDITION == "sep":
-            GAMMA = 0.85
-            LR2 = 0.001
 
 
 def train_epoch(
@@ -244,9 +129,7 @@ def train_epoch(
             model_loss_fn, metrics.GenralizedCrossEntropy
         ):
             out = model(x)
-            model_loss_val: torch.Tensor = model_loss_fn(out, y) + (
-                1 - COST
-            ) * model_loss_fn(out, torch.full_like(y, 2))
+            model_loss_val: torch.Tensor = model_loss_fn(out, y)
         else:
             print("train_epoch() error: [1]")
             exit()
@@ -366,9 +249,7 @@ def dev_epoch(
                 model_loss_fn, metrics.GenralizedCrossEntropy
             ):
                 out = model(x)
-                model_loss_val: torch.Tensor = model_loss_fn(out, y) + (
-                    1 - COST
-                ) * model_loss_fn(out, torch.full_like(y, 2))
+                model_loss_val: torch.Tensor = model_loss_fn(out, y)
                 preds = torch.concat((preds, model.infer(x)))
             else:
                 print("dev_epoch() error: [1]")
@@ -390,7 +271,7 @@ def dev_epoch(
             | metrics.accuracy(preds, true)
             | metrics.independence_metrics(preds, sens)
             | metrics.separation_metrics(preds, true, sens)
-            | metrics.l0d1_loss(preds, true, COST)
+            | metrics.l0d1_loss(preds, true, COST_0, COST_1)
         )
 
         WRITER.add_scalar(f"cov/{run_num}/{fold_num}/dev", results["cov"], epoch_num)
@@ -473,7 +354,7 @@ def test(
             | metrics.accuracy(preds, true)
             | metrics.independence_metrics(preds, sens)
             | metrics.separation_metrics(preds, true, sens)
-            | metrics.l0d1_loss(preds, true, COST)
+            | metrics.l0d1_loss(preds, true, COST_0, COST_1)
         )
 
         return results
@@ -534,10 +415,10 @@ def train_one_fold(
 
     if MODEL == "risan":
         model = models.RISAN().to(DEVICE)
-        model_loss_fn = metrics.DoubleSigmoidLoss(COST, GAMMA)
+        model_loss_fn = metrics.DoubleSigmoidLoss(COST_0, COST_1, GAMMA)
     elif MODEL == "kp1":
         model = models.KP1().to(DEVICE)
-        model_loss_fn = metrics.GenralizedCrossEntropy(GAMMA)
+        model_loss_fn = metrics.GenralizedCrossEntropy(COST_0, COST_1, GAMMA)
 
     with torch.no_grad():
         model.eval()
@@ -550,19 +431,19 @@ def train_one_fold(
         fairness_loss_fn = metrics.DemographicParity()
         lambdas = torch.nn.Parameter(torch.zeros(3, device=DEVICE))
         lambdas_optimizer = torch.optim.Adam(
-            [lambdas], fused=True, maximize=True, lr=LR2
+            [lambdas], fused=True, maximize=True, lr=LR2  # type: ignore
         )
     elif FAIRNESS_CONDITION == "sep":
         fairness_loss_fn = metrics.EqualizedOdds()
         lambdas = torch.nn.Parameter(torch.zeros(6, device=DEVICE))
         lambdas_optimizer = torch.optim.Adam(
-            [lambdas], fused=True, maximize=True, lr=LR2
+            [lambdas], fused=True, maximize=True, lr=LR2  # type: ignore
         )
     elif FAIRNESS_CONDITION == "mixed":
         fairness_loss_fn = metrics.MixedDPandEO()
         lambdas = torch.nn.Parameter(torch.zeros(3, device=DEVICE))
         lambdas_optimizer = torch.optim.Adam(
-            [lambdas], fused=True, maximize=True, lr=LR2
+            [lambdas], fused=True, maximize=True, lr=LR2  # type: ignore
         )
     else:
         fairness_loss_fn = None
@@ -600,7 +481,7 @@ def train_one_fold(
             fairness_loss_fn,
         )
 
-        if dev_loss.item() < best_loss - 1e-3:
+        if dev_loss.item() < best_loss:
             best_loss = dev_loss.item()
             best_model = deepcopy(model)
             last_improvement = 0
@@ -614,17 +495,18 @@ def train_one_fold(
     os.makedirs(f"models/{DATASET}/{MODEL}/{FAIRNESS_CONDITION}/", exist_ok=True)
     torch.save(
         best_model.state_dict(),
-        f"models/{DATASET}/{MODEL}/{FAIRNESS_CONDITION}/{COST:f}_{run_num}_{fold_num}.pt",
+        f"models/{DATASET}/{MODEL}/{FAIRNESS_CONDITION}/{COST_0:f}_{COST_1:f}_{run_num}_{fold_num}.pt",
     )
 
     os.makedirs(
-        f"outputs/{DATASET}/{MODEL}/{FAIRNESS_CONDITION}/{COST:f}/", exist_ok=True
+        f"outputs/{DATASET}/{MODEL}/{FAIRNESS_CONDITION}/{COST_0:f}_{COST_1:f}/",
+        exist_ok=True,
     )
     temp = {}
     for key in results.keys():
         temp[key] = results[key].tolist()
     with open(
-        f"outputs/{DATASET}/{MODEL}/{FAIRNESS_CONDITION}/{COST:f}/{run_num}_{fold_num}.json",
+        f"outputs/{DATASET}/{MODEL}/{FAIRNESS_CONDITION}/{COST_0:f}_{COST_1:f}/{run_num}_{fold_num}.json",
         "w",
     ) as f:
         f.write(json.dumps(temp, indent=4))
@@ -688,7 +570,7 @@ def main():
     torch.manual_seed(42)
 
     print(
-        f"{MODEL}: DATASET={DATASET}, FAIR_COND = {FAIRNESS_CONDITION}, COST={COST}, DEVICE={DEVICE}",
+        f"{MODEL}: DATASET={DATASET}, FAIR_COND = {FAIRNESS_CONDITION}, COST_0={COST_0}, COST_1={COST_1}, DEVICE={DEVICE}",
         flush=True,
     )
 
@@ -730,7 +612,8 @@ def main():
         exist_ok=True,
     )
     with open(
-        f"results/{DATASET}/{MODEL}/{FAIRNESS_CONDITION}/{COST:f}.json", "w"
+        f"results/{DATASET}/{MODEL}/{FAIRNESS_CONDITION}/{COST_0:f}_{COST_1:f}.json",
+        "w",
     ) as f:
         f.write(json.dumps(results, indent=4))
 

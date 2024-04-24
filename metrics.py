@@ -16,7 +16,7 @@ class DoubleSigmoidLoss(nn.Module):
           Hyperparameter controlling the slope of the loss.
     """
 
-    def __init__(self, d: float, gamma: float) -> None:
+    def __init__(self, cost_0: float, cost_1: float, gamma: float) -> None:
         """
         Initialize double sigmoid loss for a given cost.
 
@@ -27,7 +27,8 @@ class DoubleSigmoidLoss(nn.Module):
               Hyperparameter controlling the slope of the loss. Should be > 0.
         """
         super().__init__()
-        self.d = d
+        self.cost_0 = cost_0
+        self.cost_1 = cost_1
         self.gamma = gamma
 
     def forward(
@@ -52,10 +53,14 @@ class DoubleSigmoidLoss(nn.Module):
         """
 
         y = (2 * y - 1).float().view(-1, 1)
-        return torch.mean(
-            2 * self.d * torch.sigmoid(-self.gamma * (y * f_x - rho_x))
-            + 2 * (1 - self.d) * torch.sigmoid(-self.gamma * (y * f_x + rho_x))
+        losses = torch.where(
+            y == -1,
+            2 * self.cost_0 * torch.sigmoid(-self.gamma * (y * f_x - rho_x))
+            + 2 * (1 - self.cost_0) * torch.sigmoid(-self.gamma * (y * f_x + rho_x)),
+            2 * self.cost_1 * torch.sigmoid(-self.gamma * (y * f_x - rho_x))
+            + 2 * (1 - self.cost_1) * torch.sigmoid(-self.gamma * (y * f_x + rho_x)),
         )
+        return torch.mean(losses)
 
 
 class GenralizedCrossEntropy(nn.Module):
@@ -70,7 +75,7 @@ class GenralizedCrossEntropy(nn.Module):
           error. Refer to the paper for more information.
     """
 
-    def __init__(self, gamma: float) -> None:
+    def __init__(self, cost_0: float, cost_1: float, gamma: float) -> None:
         """
         Initializes GCE.
 
@@ -81,6 +86,8 @@ class GenralizedCrossEntropy(nn.Module):
         """
         super().__init__()
         self.gamma = gamma
+        self.cost_0 = cost_0
+        self.cost_1 = cost_1
 
     def forward(self, x, y) -> torch.Tensor:
         """
@@ -97,9 +104,17 @@ class GenralizedCrossEntropy(nn.Module):
             samples in the batch
         """
         x = F.softmax(x, dim=1)
-        x = torch.gather(x, 1, torch.unsqueeze(y, 1))
 
-        return torch.mean((1 - (x**self.gamma)) / self.gamma)
+        t = torch.gather(x, 1, torch.unsqueeze(y, 1))
+        l1 = (1 - (t**self.gamma)) / self.gamma
+
+        t = torch.gather(x, 1, torch.unsqueeze(torch.full_like(y, 2), 1))
+        l2 = (1 - (t**self.gamma)) / self.gamma
+
+        losses = torch.where(
+            y == 0, l1 + (1 - self.cost_0) * l2, l1 + (1 - self.cost_1) * l2
+        )
+        return torch.mean(losses)
 
 
 class DemographicParity(nn.Module):
@@ -188,8 +203,8 @@ class MixedDPandEO(nn.Module):
     """
     Loss function to enforce mixed constraints as proposed in our paper.
 
-    Here, we test achieving equal positive rates for both groups (from demographic parity),
-    and equal true negative rate as well as equal false negative rate for both groups
+    Here, we test achieving equal negative rates for both groups (from demographic parity),
+    and equal true positive rate as well as equal false positive rate for both groups
     (from equalized odds).
     """
 
@@ -225,19 +240,19 @@ class MixedDPandEO(nn.Module):
         group_1_y_0 = ((sens == 1) * (true == 0)).sum() + 1e-18
         group_1_y_1 = ((sens == 1) * (true == 1)).sum() + 1e-18
 
-        pos = torch.abs(
-            (r[:, 1] @ (1 - sens)) / group_0_total - (r[:, 1] @ sens) / group_1_total
+        neg = torch.abs(
+            (r[:, 0] @ (1 - sens)) / group_0_total - (r[:, 0] @ sens) / group_1_total
         ).flatten()
-        tnr = torch.abs(
-            (r[:, 0] @ ((1 - sens) * (1 - true))) / group_0_y_0
-            - (r[:, 0] @ (sens * (1 - true))) / group_1_y_0
+        tpr = torch.abs(
+            (r[:, 1] @ ((1 - sens) * true)) / group_0_y_1
+            - (r[:, 1] @ (sens * true)) / group_1_y_1
         ).flatten()
-        fnr = torch.abs(
-            (r[:, 0] @ ((1 - sens) * true)) / group_0_y_1
-            - (r[:, 0] @ (sens * true)) / group_1_y_1
+        fpr = torch.abs(
+            (r[:, 1] @ ((1 - sens) * (1 - true))) / group_0_y_0
+            - (r[:, 1] @ (sens * (1 - true))) / group_1_y_0
         ).flatten()
 
-        return torch.concat((pos, tnr, fnr))
+        return torch.concat((neg, tpr, fpr))
 
 
 def coverage(pred: torch.Tensor) -> dict[str, torch.Tensor]:
@@ -252,7 +267,7 @@ def coverage(pred: torch.Tensor) -> dict[str, torch.Tensor]:
     Returns:
         A dictionary with key "cov" containing a tensor with the coverage of the model.
     """
-    return {"cov": (pred != -1).sum() / pred.shape[0]}
+    return {"cov": 100 * (pred != -1).sum() / pred.shape[0]}
 
 
 def accuracy(pred: torch.Tensor, true: torch.Tensor) -> dict[str, torch.Tensor]:
@@ -269,7 +284,11 @@ def accuracy(pred: torch.Tensor, true: torch.Tensor) -> dict[str, torch.Tensor]:
     Returns:
         A dictionary with key "acc" containing a tensor with the accuracy of the model.
     """
-    return {"acc": ((pred != -1) * (pred == true)).sum() / ((pred != -1).sum() + 1e-18)}
+    return {
+        "acc": 100
+        * ((pred != -1) * (pred == true)).sum()
+        / ((pred != -1).sum() + 1e-18)
+    }
 
 
 def independence_metrics(
@@ -296,12 +315,12 @@ def independence_metrics(
     group_1_total = (sens == 1).sum() + 1e-18
 
     return {
-        "neg_0": ((sens == 0) * (pred == 1)).sum() / group_0_total,
-        "neg_1": ((sens == 1) * (pred == 1)).sum() / group_1_total,
-        "pos_0": ((sens == 0) * (pred == 0)).sum() / group_0_total,
-        "pos_1": ((sens == 1) * (pred == 0)).sum() / group_1_total,
-        "abs_0": ((sens == 0) * (pred == -1)).sum() / group_0_total,
-        "abs_1": ((sens == 1) * (pred == -1)).sum() / group_1_total,
+        "pos_0": 100 * ((sens == 0) * (pred == 1)).sum() / group_0_total,
+        "pos_1": 100 * ((sens == 1) * (pred == 1)).sum() / group_1_total,
+        "neg_0": 100 * ((sens == 0) * (pred == 0)).sum() / group_0_total,
+        "neg_1": 100 * ((sens == 1) * (pred == 0)).sum() / group_1_total,
+        "abs_0": 100 * ((sens == 0) * (pred == -1)).sum() / group_0_total,
+        "abs_1": 100 * ((sens == 1) * (pred == -1)).sum() / group_1_total,
     }
 
 
@@ -334,23 +353,26 @@ def separation_metrics(
     group_1_y_1 = ((sens == 1) * (true == 1)).sum() + 1e-18
 
     return {
-        "tnr_0": ((sens == 0) * (pred == 0) * (true == 0)).sum() / group_0_y_0,
-        "tnr_1": ((sens == 1) * (pred == 0) * (true == 0)).sum() / group_1_y_0,
-        "fpr_0": ((sens == 0) * (pred == 1) * (true == 0)).sum() / group_0_y_0,
-        "fpr_1": ((sens == 1) * (pred == 1) * (true == 0)).sum() / group_1_y_0,
-        "nar_0": ((sens == 0) * (pred == -1) * (true == 0)).sum() / group_0_y_0,
-        "nar_1": ((sens == 1) * (pred == -1) * (true == 0)).sum() / group_1_y_0,
-        "fnr_0": ((sens == 0) * (pred == 0) * (true == 1)).sum() / group_0_y_1,
-        "fnr_1": ((sens == 1) * (pred == 0) * (true == 1)).sum() / group_1_y_1,
-        "tpr_0": ((sens == 0) * (pred == 1) * (true == 1)).sum() / group_0_y_1,
-        "tpr_1": ((sens == 1) * (pred == 1) * (true == 1)).sum() / group_1_y_1,
-        "par_0": ((sens == 0) * (pred == -1) * (true == 1)).sum() / group_0_y_1,
-        "par_1": ((sens == 1) * (pred == -1) * (true == 1)).sum() / group_1_y_1,
+        "tpr_0": 100 * ((sens == 0) * (pred == 1) * (true == 1)).sum() / group_0_y_1,
+        "tpr_1": 100 * ((sens == 1) * (pred == 1) * (true == 1)).sum() / group_1_y_1,
+        "fnr_0": 100 * ((sens == 0) * (pred == 0) * (true == 1)).sum() / group_0_y_1,
+        "fnr_1": 100 * ((sens == 1) * (pred == 0) * (true == 1)).sum() / group_1_y_1,
+        "par_0": 100 * ((sens == 0) * (pred == -1) * (true == 1)).sum() / group_0_y_1,
+        "par_1": 100 * ((sens == 1) * (pred == -1) * (true == 1)).sum() / group_1_y_1,
+        "fpr_0": 100 * ((sens == 0) * (pred == 1) * (true == 0)).sum() / group_0_y_0,
+        "fpr_1": 100 * ((sens == 1) * (pred == 1) * (true == 0)).sum() / group_1_y_0,
+        "tnr_0": 100 * ((sens == 0) * (pred == 0) * (true == 0)).sum() / group_0_y_0,
+        "tnr_1": 100 * ((sens == 1) * (pred == 0) * (true == 0)).sum() / group_1_y_0,
+        "nar_0": 100 * ((sens == 0) * (pred == -1) * (true == 0)).sum() / group_0_y_0,
+        "nar_1": 100 * ((sens == 1) * (pred == -1) * (true == 0)).sum() / group_1_y_0,
     }
 
 
 def l0d1_loss(
-    pred: torch.Tensor, true: torch.Tensor, d: float
+    pred: torch.Tensor,
+    true: torch.Tensor,
+    cost_0: float,
+    cost_1: float,
 ) -> dict[str, torch.Tensor]:
     """
     Calculates the l0d1 loss for a model.
@@ -369,7 +391,11 @@ def l0d1_loss(
         of the model
     """
     return {
-        "l0d1": (((pred != true) * (pred != -1)).sum() + d * (pred == -1).sum())
+        "l0d1": (
+            ((pred != true) * (pred != -1)).sum()
+            + cost_0 * ((pred == -1) * (true == 0)).sum()
+            + cost_1 * ((pred == -1) * (true == 1)).sum()
+        )
         / pred.shape[0]
     }
 
