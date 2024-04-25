@@ -431,19 +431,28 @@ def train_one_fold(
         fairness_loss_fn = metrics.DemographicParity()
         lambdas = torch.nn.Parameter(torch.zeros(3, device=DEVICE))
         lambdas_optimizer = torch.optim.Adam(
-            [lambdas], fused=True, maximize=True, lr=LR2  # type: ignore
+            [lambdas],
+            fused=True,
+            maximize=True,
+            lr=LR2,  # type: ignore
         )
     elif FAIRNESS_CONDITION == "sep":
         fairness_loss_fn = metrics.EqualizedOdds()
         lambdas = torch.nn.Parameter(torch.zeros(6, device=DEVICE))
         lambdas_optimizer = torch.optim.Adam(
-            [lambdas], fused=True, maximize=True, lr=LR2  # type: ignore
+            [lambdas],
+            fused=True,
+            maximize=True,
+            lr=LR2,  # type: ignore
         )
     elif FAIRNESS_CONDITION == "mixed":
         fairness_loss_fn = metrics.MixedDPandEO()
         lambdas = torch.nn.Parameter(torch.zeros(3, device=DEVICE))
         lambdas_optimizer = torch.optim.Adam(
-            [lambdas], fused=True, maximize=True, lr=LR2  # type: ignore
+            [lambdas],
+            fused=True,
+            maximize=True,
+            lr=LR2,  # type: ignore
         )
     else:
         fairness_loss_fn = None
@@ -482,7 +491,7 @@ def train_one_fold(
         )
 
         if dev_loss.item() < best_loss:
-            best_loss = dev_loss.item()
+            best_loss = dev_loss.item() - 1e-3
             best_model = deepcopy(model)
             last_improvement = 0
         else:
