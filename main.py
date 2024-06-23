@@ -1,7 +1,7 @@
-from argparse import ArgumentParser
 from copy import deepcopy
+from typing import Any
+import argparse
 import json
-import math
 import os
 import random
 
@@ -13,308 +13,48 @@ import torch
 import torch.nn as nn
 import torch.optim
 import torch.utils.data
-import torch.utils.tensorboard
 
 import dataset
 import metrics
 import models
 
-parser = ArgumentParser()
-parser.add_argument("--model", type=str, choices=["RISAN", "KP1"], required=True)
-parser.add_argument(
-    "--fairness_condition",
-    type=str,
-    choices=["None", "Ind", "Sep", "Mixed"],
-    required=True,
-)
-parser.add_argument("--cost_0", type=float, required=True)
-parser.add_argument("--cost_1", type=float, required=True)
-parser.add_argument(
-    "--dataset",
-    type=str,
-    choices=["Adult", "Bank", "Compas", "Default", "German"],
-    required=True,
-)
-parser.add_argument("--gamma", type=float, required=True)
-parser.add_argument("--lr1", type=float, required=True)
-parser.add_argument("--lr2", type=float, required=True)
-parser.add_argument("--tqdm", type=str, choices=["Yes", "No"], required=True)
 
-args = parser.parse_args()
-MODEL: str = (args.model).lower()
-FAIRNESS_CONDITION: str = (args.fairness_condition).lower()
-EPOCHS: int = 10000
-DATASET: str = (args.dataset).lower()
-if DATASET == "german" or DATASET == "compas":
-    BATCH_SIZE: int = 256
-else:
-    BATCH_SIZE: int = 2048
-COST_0: float = float(args.cost_0)
-COST_1: float = float(args.cost_1)
-GAMMA: float = float(args.gamma)
-LR1: float = float(args.lr1)
-LR2: float = float(args.lr2)
-DISABLE_TQDM = False if args.tqdm == "Yes" else True
-DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-WRITER = torch.utils.tensorboard.SummaryWriter(  # type: ignore
-    f"runs/{DATASET}/{MODEL}/{FAIRNESS_CONDITION}/{COST_0}_{COST_1}"
-)
-
-
-def train_epoch(
-    run_num: int,
-    fold_num: int,
-    epoch_num: int,
-    train_dataloader: dataset.MultiEpochsDataLoader,
-    model: models.RISAN | models.KP1,
-    model_loss_fn: (
-        metrics.DoubleSigmoidLoss | metrics.GenralizedCrossEntropy | nn.NLLLoss
-    ),
-    model_optimizer: torch.optim.Adam,
-    lambdas: torch.Tensor | None,
-    fairness_loss_fn: (
-        metrics.DemographicParity | metrics.EqualizedOdds | metrics.MixedDPandEO | None
-    ),
-    lambdas_optimizer: torch.optim.Adam | None,
-):
+def get_data(
+    dataset: str,
+) -> tuple[npt.NDArray[np.float64], npt.NDArray[np.float64], npt.NDArray[np.float64]]:
     """
-    Trains one epoch of the model.
+    Returns training, validation, and testing data for a single run.
+
+    For Adult dataset, uses the provided train-test split and generates validation dataset
+    from the train dataset. For Bank and Compas dataset, generates the train-val-test split
+    from the data.
 
     Args:
-        run_num:
-          Current run number
-        fold_num:
-          Current fold number
-        epoch_num:
-          Current epoch number
-        train_dataloader:
-          Dataloader containing train samples.
-        model:
-          Inital model or the model after previous epoch
-        model_loss_fn:
-          The loss function to be used for training the model.
-        model_optimimzer:
-          The optimizer for the model.
-        lambdas:
-          None if fairness is not required, else a tensor of shape
-          (3) for demographic parity, (6) for equalized odds, or (3) for
-          mixed constraints.
-        fairness_loss_fn:
-          None if fairness is not required, else either demographic parity or
-          equalized odds.
-        lambdas optimizer:
-          None if fairness is not required, else a maximizing optimizer for the
-          lambas.
+        dataset:
+          Name of the dataset
+
+    Returns:
+        Tuple of (train data, val data, test data)
     """
-    model.train()
-    model_loss = torch.zeros(1, device=DEVICE)
-    fairness_loss = torch.zeros(1, device=DEVICE)
-    lambdas_loss = torch.zeros(1, device=DEVICE)
 
-    for batch in tqdm(
-        train_dataloader, desc="Training network", leave=False, disable=DISABLE_TQDM
-    ):
-        x, y, z = batch
-        x = x.to(DEVICE)
-        y = y.to(DEVICE)
-        z = z.to(DEVICE)
+    if dataset == "Adult":
+        data = pd.read_csv("data/adult_train.csv", header=None).to_numpy()
+        np.random.shuffle(data)
+        train_data = data[: int(data.shape[0] * 0.8571)]
+        val_data = data[int(data.shape[0] * 0.8571) :]
+        test_data = pd.read_csv("data/adult_test.csv", header=None).to_numpy()
+    else:
+        data = pd.read_csv(f"data/{dataset.lower()}.csv", header=None).to_numpy()
+        np.random.shuffle(data)
+        train_data = data[: int(data.shape[0] * 0.7)]
+        val_data = data[int(data.shape[0] * 0.7) : int(data.shape[0] * 0.8)]
+        test_data = data[int(data.shape[0] * 0.8) :]
 
-        probs = model.probs(x)
-        if isinstance(model, models.RISAN) and isinstance(
-            model_loss_fn, metrics.DoubleSigmoidLoss
-        ):
-            f, rho = model(x)
-            model_loss_val: torch.Tensor = model_loss_fn(f, rho, y)
-        elif isinstance(model, models.KP1) and isinstance(
-            model_loss_fn, metrics.GenralizedCrossEntropy
-        ):
-            out = model(x)
-            model_loss_val: torch.Tensor = model_loss_fn(out, y)
-        else:
-            print("train_epoch() error: [1]")
-            exit()
-
-        fairness_loss_val: torch.Tensor = (
-            torch.zeros_like(model_loss_val, device=DEVICE)
-            if lambdas is None or fairness_loss_fn is None
-            else (lambdas * fairness_loss_fn(r=probs, true=y, sens=z)).sum()
-        )
-
-        loss = model_loss_val + fairness_loss_val
-        model_optimizer.zero_grad(set_to_none=True)
-        loss.backward()
-        model_optimizer.step()
-        model_loss += model_loss_val.detach()
-        fairness_loss += fairness_loss_val.detach()
-
-    if (
-        lambdas is not None
-        and fairness_loss_fn is not None
-        and lambdas_optimizer is not None
-    ):
-        for batch in tqdm(
-            train_dataloader, desc="Updating lambdas", leave=False, disable=DISABLE_TQDM
-        ):
-            x, y, z = batch
-            x = x.to(DEVICE)
-            y = y.to(DEVICE)
-            z = z.to(DEVICE)
-
-            probs = model.probs(x)
-            loss: torch.Tensor = (
-                lambdas * fairness_loss_fn(r=probs, true=y, sens=z)
-            ).sum()
-            lambdas_optimizer.zero_grad(set_to_none=True)
-            loss.backward()
-            lambdas_optimizer.step()
-            with torch.no_grad():
-                lambdas.clamp_(min=0)
-            lambdas_loss += loss.detach()
-
-    model_loss /= len(train_dataloader)
-    fairness_loss /= len(train_dataloader)
-    lambdas_loss /= len(train_dataloader)
-
-    WRITER.add_scalar(f"model loss/{run_num}/{fold_num}/train", model_loss, epoch_num)
-    WRITER.add_scalar(
-        f"fairness loss/{run_num}/{fold_num}/train", fairness_loss, epoch_num
-    )
-    WRITER.add_scalar(
-        f"total loss/{run_num}/{fold_num}/train", model_loss + fairness_loss, epoch_num
-    )
-    WRITER.add_scalar(
-        f"lambdas loss/{run_num}/{fold_num}/train", lambdas_loss, epoch_num
-    )
+    return train_data, val_data, test_data
 
 
-def dev_epoch(
-    run_num: int,
-    fold_num: int,
-    epoch_num: int,
-    test_dataloader: dataset.MultiEpochsDataLoader,
-    model: models.RISAN | models.KP1,
-    model_loss_fn: (
-        metrics.DoubleSigmoidLoss | metrics.GenralizedCrossEntropy | nn.NLLLoss
-    ),
-    lambdas: torch.Tensor | None,
-    fairness_loss_fn: (
-        metrics.DemographicParity | metrics.EqualizedOdds | metrics.MixedDPandEO | None
-    ),
-) -> torch.Tensor:
-    """
-    Runs one dev epoch for the model.
-
-    Args:
-        test_dataloader:
-          Dataloader containing test samples.
-        model:
-          Inital model or the model after previous epoch
-        model_loss_fn:
-          The loss function used for training the model.
-        lambdas:
-          None if fairness is not required, else a tensor of shape (3) for demographic
-          demographic parity, (6) for equalized odds or (3) for mixed constraints.
-        fairness_loss_fn:
-          None if fairness is not required, else either demographic parity,
-          equalized odds, or mixed constraints.
-        dev_loss:
-          Contains value of the epoch loss after the epoch is finished
-    """
-    model.eval()
-    model_loss = torch.zeros(1, device=DEVICE)
-    fairness_loss = torch.zeros(1, device=DEVICE)
-
-    preds = torch.empty(0, device=DEVICE)
-    true = torch.empty(0, dtype=torch.long, device=DEVICE)
-    sens = torch.empty(0, dtype=torch.long, device=DEVICE)
-    with torch.no_grad():
-        for batch in tqdm(
-            test_dataloader, desc="Dev loop", leave=False, disable=DISABLE_TQDM
-        ):
-            x, y, z = batch
-            x = x.to(DEVICE)
-            y = y.to(DEVICE)
-            z = z.to(DEVICE)
-            true = torch.concat((true, y))
-            sens = torch.concat((sens, z))
-
-            probs = model.probs(x)
-            if isinstance(model, models.RISAN) and isinstance(
-                model_loss_fn, metrics.DoubleSigmoidLoss
-            ):
-                f, rho = model(x)
-                model_loss_val: torch.Tensor = model_loss_fn(f, rho, y)
-                preds = torch.concat((preds, model.infer(x)))
-            elif isinstance(model, models.KP1) and isinstance(
-                model_loss_fn, metrics.GenralizedCrossEntropy
-            ):
-                out = model(x)
-                model_loss_val: torch.Tensor = model_loss_fn(out, y)
-                preds = torch.concat((preds, model.infer(x)))
-            else:
-                print("dev_epoch() error: [1]")
-                exit()
-
-            fairness_loss_val: torch.Tensor = (
-                torch.zeros_like(model_loss_val, device=DEVICE)
-                if lambdas is None or fairness_loss_fn is None
-                else (lambdas * fairness_loss_fn(r=probs, true=y, sens=z)).sum()
-            )
-            model_loss += model_loss_val.detach()
-            fairness_loss += fairness_loss_val.detach()
-
-        model_loss /= len(test_dataloader)
-        fairness_loss /= len(test_dataloader)
-
-        results = (
-            metrics.coverage(preds)
-            | metrics.accuracy(preds, true)
-            | metrics.independence_metrics(preds, sens)
-            | metrics.separation_metrics(preds, true, sens)
-            | metrics.l0d1_loss(preds, true, COST_0, COST_1)
-        )
-
-        WRITER.add_scalar(f"cov/{run_num}/{fold_num}/dev", results["cov"], epoch_num)
-        WRITER.add_scalar(f"acc/{run_num}/{fold_num}/dev", results["acc"], epoch_num)
-        WRITER.add_scalar(f"l0d1/{run_num}/{fold_num}/dev", results["l0d1"], epoch_num)
-        WRITER.add_scalar(f"model loss/{run_num}/{fold_num}/dev", model_loss, epoch_num)
-        WRITER.add_scalar(
-            f"fairness loss/{run_num}/{fold_num}/dev", fairness_loss, epoch_num
-        )
-        WRITER.add_scalar(
-            f"total loss/{run_num}/{fold_num}/dev",
-            model_loss + fairness_loss,
-            epoch_num,
-        )
-
-        for metric in ["neg", "pos", "abs", "tnr", "fpr", "nar", "fnr", "tpr", "par"]:
-            WRITER.add_scalar(
-                f"{metric}/{run_num}/{fold_num}/dev/group 0",
-                results[f"{metric}_0"],
-                epoch_num,
-            )
-            WRITER.add_scalar(
-                f"{metric}/{run_num}/{fold_num}/dev/group 1",
-                results[f"{metric}_1"],
-                epoch_num,
-            )
-            WRITER.add_scalar(
-                f"{metric}/{run_num}/{fold_num}/dev/delta",
-                torch.abs(results[f"{metric}_0"] - results[f"{metric}_1"]),
-                epoch_num,
-            )
-        if lambdas is not None:
-            for idx in range(lambdas.shape[0]):
-                WRITER.add_scalar(
-                    f"lambda_{idx}/{run_num}/{fold_num}/dev", lambdas[idx], epoch_num
-                )
-
-        return model_loss + fairness_loss
-
-
-def test(
-    test_dataloader: dataset.MultiEpochsDataLoader,
-    model: models.RISAN | models.KP1,
+def test_model(
+    test_dataloader: torch.utils.data.DataLoader, model: models.RISAN | models.KP1, args
 ) -> dict[str, torch.Tensor]:
     """
     Tests the model and calculates its metrics.
@@ -328,170 +68,246 @@ def test(
     Returns:
         Returns a dictionary containing the model's performance metrics.
     """
-    if DISABLE_TQDM:
-        print("Started testing", flush=True)
 
-    preds = torch.empty(0, device=DEVICE)
-    true = torch.empty(0, dtype=torch.long, device=DEVICE)
-    sens = torch.empty(0, dtype=torch.long, device=DEVICE)
+    pass
+    preds = torch.empty(0, device=args.device)
+    true = torch.empty(0, dtype=torch.long, device=args.device)
+    sens = torch.empty(0, dtype=torch.long, device=args.device)
     model.eval()
 
     with torch.no_grad():
         for batch in tqdm(
-            test_dataloader, desc="Testing", leave=False, disable=DISABLE_TQDM
+            test_dataloader, desc="Testing", leave=False, disable=not args.tqdm
         ):
             x, y, z = batch
-            x = x.to(DEVICE)
-            y = y.to(DEVICE)
-            z = z.to(DEVICE)
+            x = x.to(args.device)
+            y = y.to(args.device)
+            z = z.to(args.device)
 
             preds = torch.concat((preds, model.infer(x)))
             true = torch.concat((true, y))
             sens = torch.concat((sens, z))
 
-        results = (
+        return (
             metrics.coverage(preds)
             | metrics.accuracy(preds, true)
             | metrics.independence_metrics(preds, sens)
             | metrics.separation_metrics(preds, true, sens)
-            | metrics.l0d1_loss(preds, true, COST_0, COST_1)
+            | metrics.l0d1_loss(preds, true, args.cost)
         )
 
-        return results
 
-
-def train_one_fold(
-    run_num: int,
-    fold_num: int,
-    train_data: npt.NDArray[np.float64],
-    test_data: npt.NDArray[np.float64],
-) -> dict[str, torch.Tensor]:
+def train_model(
+    train_dataloader: torch.utils.data.DataLoader,
+    val_dataloader: torch.utils.data.DataLoader,
+    args,
+) -> models.RISAN | models.KP1:
     """
-    Trains one fold of the 5-fold cross-validation.
+    Trains a model and returns it.
 
     Args:
-        run_num:
-          Current run number
-        fold_num:
-          Current fold number
-        train_data:
-          Numeric train data such that the second last column is the sensitive attribute
-          with values 0 or 1 and the last column is the label with values 0 or 1.
-        test_data:
-          Numeric test data such that the second last column is the sensitive attribute
-          with values 0 or 1 and the last column is the label with values 0 or 1.
+        train_dataloader:
+          Dataloader containing train samples
+        val_dataloader:
+          Dataloader containing validation samples.
 
     Returns:
-        Returns a dictionary containing the model's performance metrics.
+      A trained model
+
+    Side-effects:
+    1) Writes the loss-epoch, l0d1-epoch, obj-epoch arrays for the train dataset to f"{args.output_dir}/run_{args.run_num}_train_metric-epochs.json"
+    1) Writes the loss-epoch, l0d1-epoch, obj-epoch arrays for the val dataset to f"{args.output_dir}/run_{args.run_num}_val_metric-epochs.json"
     """
-    if DISABLE_TQDM:
-        print(f"Fold number {fold_num} started", flush=True)
-
-    train_x = train_data[:, :-1].astype(np.float32)
-    train_y = train_data[:, -1].astype(np.int64)
-    train_z = train_data[:, -2].astype(np.int64)
-    test_x = test_data[:, :-1].astype(np.float32)
-    test_y = test_data[:, -1].astype(np.int64)
-    test_z = test_data[:, -2].astype(np.int64)
-
-    train_x, test_x = dataset.data_processing(train_x, test_x)
-    train_dataset = dataset.CustomDataset(train_x, train_y, train_z)
-    test_dataset = dataset.CustomDataset(test_x, test_y, test_z)
-    train_dataloader = dataset.MultiEpochsDataLoader(
-        train_dataset,
-        batch_size=BATCH_SIZE,
-        shuffle=True,
-        num_workers=2,
-        persistent_workers=True,
-        pin_memory=True,
-    )
-    test_dataloader = dataset.MultiEpochsDataLoader(
-        test_dataset,
-        batch_size=BATCH_SIZE,
-        num_workers=2,
-        persistent_workers=True,
-        pin_memory=True,
-    )
-
-    if MODEL == "risan":
-        model = models.RISAN().to(DEVICE)
-        model_loss_fn = metrics.DoubleSigmoidLoss(COST_0, COST_1, GAMMA)
-    elif MODEL == "kp1":
-        model = models.KP1().to(DEVICE)
-        model_loss_fn = metrics.GenralizedCrossEntropy(COST_0, COST_1, GAMMA)
+    if args.model == "RISAN":
+        model = models.RISAN().to(args.device)
+        loss_fn = metrics.DoubleSigmoidLoss(args.cost, args.gamma)
+    else:
+        model = models.KP1().to(args.device)
+        loss_fn = metrics.GeneralizedCrossEntropy(args.cost, args.gamma)
 
     with torch.no_grad():
         model.eval()
-        model(train_dataset[0][0].view(1, -1).to(DEVICE))
+        model(train_dataloader.dataset[0][0].view(1, -1).to(args.device))
         model.train()
-
-    model_optimizer = torch.optim.Adam(model.parameters(), fused=True, lr=LR1)
-
-    if FAIRNESS_CONDITION == "ind":
-        fairness_loss_fn = metrics.DemographicParity()
-        lambdas = torch.nn.Parameter(torch.zeros(3, device=DEVICE))
-        lambdas_optimizer = torch.optim.Adam(
-            [lambdas],
-            fused=True,
-            maximize=True,
-            lr=LR2,  # type: ignore
+    model_optimizer = torch.optim.Adam(model.parameters(), fused=True, lr=args.lr1)
+    lambdas = (
+        torch.nn.Parameter(
+            torch.zeros(len(args.fairness_conditions), device=args.device)
         )
-    elif FAIRNESS_CONDITION == "sep":
-        fairness_loss_fn = metrics.EqualizedOdds()
-        lambdas = torch.nn.Parameter(torch.zeros(6, device=DEVICE))
-        lambdas_optimizer = torch.optim.Adam(
-            [lambdas],
-            fused=True,
-            maximize=True,
-            lr=LR2,  # type: ignore
-        )
-    elif FAIRNESS_CONDITION == "mixed":
-        fairness_loss_fn = metrics.MixedDPandEO()
-        lambdas = torch.nn.Parameter(torch.zeros(3, device=DEVICE))
-        lambdas_optimizer = torch.optim.Adam(
-            [lambdas],
-            fused=True,
-            maximize=True,
-            lr=LR2,  # type: ignore
-        )
-    else:
-        fairness_loss_fn = None
-        lambdas = None
-        lambdas_optimizer = None
+        if args.fairness_conditions is not None
+        else None
+    )
+    lambdas_optimizer = (
+        torch.optim.Adam([lambdas], fused=True, maximize=True, lr=args.lr2)
+        if lambdas is not None
+        else None
+    )
+    lambdas_fn = (
+        metrics.FairnessConstraints(args.fairness_conditions)
+        if args.fairness_conditions is not None
+        else None
+    )
 
     best_model = deepcopy(model)
-    best_loss = math.inf
+    best_loss = float("inf")
     last_improvement = 0
 
+    train_stats = []
+    val_stats = []
     for epoch_num in tqdm(
-        range(EPOCHS), desc="Epochs", leave=False, disable=DISABLE_TQDM
+        range(args.epochs), desc="Epochs", leave=False, disable=not args.tqdm
     ):
-        train_epoch(
-            run_num,
-            fold_num,
-            epoch_num,
-            train_dataloader,
-            model,
-            model_loss_fn,
-            model_optimizer,
-            lambdas,
-            fairness_loss_fn,
-            lambdas_optimizer,
-        )
+        model.train()
+        loss = torch.zeros(1, device=args.device, requires_grad=False)
+        obj = torch.zeros(1, device=args.device, requires_grad=False)
+        stats = []
+        num_batches = 0
+        for batch in tqdm(
+            train_dataloader, desc="Training", leave=False, disable=not args.tqdm
+        ):
+            num_batches += 1
+            x, y, z = batch
+            x = x.to(args.device)
+            y = y.to(args.device)
+            z = z.to(args.device)
 
-        dev_loss = dev_epoch(
-            run_num,
-            fold_num,
-            epoch_num,
-            test_dataloader,
-            model,
-            model_loss_fn,
-            lambdas,
-            fairness_loss_fn,
-        )
+            preds = model.infer(x)
+            probs = model.probs(x)
+            if isinstance(model, models.RISAN) and isinstance(
+                loss_fn, metrics.DoubleSigmoidLoss
+            ):
+                f, rho = model(x)
+                model_loss: torch.Tensor = loss_fn(f, rho, y)
+            elif isinstance(model, models.KP1) and isinstance(
+                loss_fn, metrics.GeneralizedCrossEntropy
+            ):
+                out = model(x)
+                model_loss: torch.Tensor = loss_fn(out, y)
+            else:
+                print("Train model error: [1]")
+                exit()
 
-        if dev_loss.item() < best_loss:
-            best_loss = dev_loss.item() - 1e-3
+            if lambdas is not None and lambdas_fn is not None:
+                fairness_loss: torch.Tensor = (
+                    lambdas * lambdas_fn(r=probs, true=y, sens=z)
+                ).sum()
+            else:
+                fairness_loss = torch.zeros_like(model_loss)
+
+            model_optimizer.zero_grad()
+            (model_loss + fairness_loss).backward()
+            model_optimizer.step()
+            loss += model_loss.detach()
+            obj += (model_loss + fairness_loss).detach()
+            stats.append(
+                metrics.coverage(preds)
+                | metrics.accuracy(preds, y)
+                | metrics.independence_metrics(preds, z)
+                | metrics.separation_metrics(preds, y, z)
+                | metrics.l0d1_loss(preds, y, args.cost)
+            )
+
+        epoch_stats: dict[str, Any] = {
+            "loss": loss / num_batches,
+            "obj": obj / num_batches,
+        } | metrics.combine_results(stats)[0]
+        if lambdas is not None and lambdas_fn is not None:
+            epoch_stats["lambdas"] = {}
+            for idx in range(lambdas.shape[0]):
+                epoch_stats["lambdas"][lambdas_fn.names[idx]] = lambdas[idx].item()
+        for key in epoch_stats:
+            if isinstance(epoch_stats[key], torch.Tensor):
+                epoch_stats[key] = epoch_stats[key].item()
+        train_stats.append(epoch_stats)
+
+        model.eval()
+        if (
+            lambdas is not None
+            and lambdas_fn is not None
+            and lambdas_optimizer is not None
+        ):
+            for batch in tqdm(
+                train_dataloader,
+                desc="Updating lambdas",
+                leave=False,
+                disable=not args.tqdm,
+            ):
+                x, y, z = batch
+                x = x.to(args.device)
+                y = y.to(args.device)
+                z = z.to(args.device)
+                probs = model.probs(x)
+                fairness_loss: torch.Tensor = (
+                    lambdas * lambdas_fn(r=probs, true=y, sens=z)
+                ).sum()
+                lambdas_optimizer.zero_grad()
+                fairness_loss.backward()
+                lambdas_optimizer.step()
+                with torch.no_grad():
+                    lambdas.clamp_(min=0)
+
+        loss = torch.zeros(1, device=args.device, requires_grad=False)
+        obj = torch.zeros(1, device=args.device, requires_grad=False)
+        stats = []
+        num_batches = 0
+        with torch.no_grad():
+            for batch in tqdm(
+                val_dataloader, desc="Validating", leave=False, disable=not args.tqdm
+            ):
+                num_batches += 1
+                x, y, z = batch
+                x = x.to(args.device)
+                y = y.to(args.device)
+                z = z.to(args.device)
+
+                preds = model.infer(x)
+                probs = model.probs(x)
+                if isinstance(model, models.RISAN) and isinstance(
+                    loss_fn, metrics.DoubleSigmoidLoss
+                ):
+                    f, rho = model(x)
+                    model_loss: torch.Tensor = loss_fn(f, rho, y)
+                elif isinstance(model, models.KP1) and isinstance(
+                    loss_fn, metrics.GeneralizedCrossEntropy
+                ):
+                    out = model(x)
+                    model_loss: torch.Tensor = loss_fn(out, y)
+                else:
+                    print("Train model error: [1]")
+                    exit()
+
+                if lambdas is not None and lambdas_fn is not None:
+                    fairness_loss: torch.Tensor = (
+                        lambdas * lambdas_fn(r=probs, true=y, sens=z)
+                    ).sum()
+                else:
+                    fairness_loss = torch.zeros_like(model_loss)
+
+                loss += model_loss.detach()
+                obj += (model_loss + fairness_loss).detach()
+                stats.append(
+                    metrics.coverage(preds)
+                    | metrics.accuracy(preds, y)
+                    | metrics.independence_metrics(preds, z)
+                    | metrics.separation_metrics(preds, y, z)
+                    | metrics.l0d1_loss(preds, y, args.cost)
+                )
+
+        epoch_stats: dict[str, Any] = {
+            "loss": loss / num_batches,
+            "obj": obj / num_batches,
+        } | metrics.combine_results(stats)[0]
+        if lambdas is not None and lambdas_fn is not None:
+            epoch_stats["lambdas"] = {}
+            for idx in range(lambdas.shape[0]):
+                epoch_stats["lambdas"][lambdas_fn.names[idx]] = lambdas[idx].item()
+        for key in epoch_stats:
+            if isinstance(epoch_stats[key], torch.Tensor):
+                epoch_stats[key] = epoch_stats[key].item()
+        val_stats.append(epoch_stats)
+
+        if obj.item() < 0.9999 * best_loss:
+            best_loss = obj.item()
             best_model = deepcopy(model)
             last_improvement = 0
         else:
@@ -499,133 +315,127 @@ def train_one_fold(
             if last_improvement == 10:
                 break
 
-    best_model.eval()
-    results = test(test_dataloader, best_model)
-    os.makedirs(f"models/{DATASET}/{MODEL}/{FAIRNESS_CONDITION}/", exist_ok=True)
-    torch.save(
-        best_model.state_dict(),
-        f"models/{DATASET}/{MODEL}/{FAIRNESS_CONDITION}/{COST_0:f}_{COST_1:f}_{run_num}_{fold_num}.pt",
-    )
-
-    os.makedirs(
-        f"outputs/{DATASET}/{MODEL}/{FAIRNESS_CONDITION}/{COST_0:f}_{COST_1:f}/",
-        exist_ok=True,
-    )
-    temp = {}
-    for key in results.keys():
-        temp[key] = results[key].tolist()
+    train_stats = train_stats[:-10]
+    val_stats = val_stats[:-10]
     with open(
-        f"outputs/{DATASET}/{MODEL}/{FAIRNESS_CONDITION}/{COST_0:f}_{COST_1:f}/{run_num}_{fold_num}.json",
-        "w",
+        f"{args.output_dir}/run_{args.run_num}_train_metric-epochs.json", "w"
     ) as f:
-        f.write(json.dumps(temp, indent=4))
+        f.write(json.dumps(train_stats, indent=4))
+    with open(f"{args.output_dir}/run_{args.run_num}_val_metric-epochs.json", "w") as f:
+        f.write(json.dumps(val_stats, indent=4))
 
-    return results
+    return best_model
 
 
-def train_one_run(
-    run_num: int,
-    train_data: npt.NDArray[np.float64],
-    test_data: npt.NDArray[np.float64] | None,
-) -> dict[str, torch.Tensor]:
+def run(args) -> dict[str, torch.Tensor]:
     """
-    Completes one run of the five runs of the model. Uses 5-fold cross-validation
-    if test data is not provided.
+    Returns the results of a single run as a dictionary.
 
-    Args:
-        run_num:
-          Current run number
-        train_data:
-          Numeric training data from the dataset.
-        test_data:
-          None if no separate test data is provided, else the provided test data.
-
-    Returns:
-        Returns a dictionary contaning the average of all the model's performance across
-        the various runs.
+    Side-effects:
+    1) Writes the results of test data to f"{args.output_dir}/run_{args.run_num}_results.json"
     """
+    train_data, val_data, test_data = get_data(args.dataset)
+    train_x = train_data[:, :-1].astype(np.float32)
+    train_y = train_data[:, -1].astype(np.int64)
+    train_z = train_data[:, -2].astype(np.int64)
+    val_x = val_data[:, :-1].astype(np.float32)
+    val_y = val_data[:, -1].astype(np.int64)
+    val_z = val_data[:, -2].astype(np.int64)
+    test_x = test_data[:, :-1].astype(np.float32)
+    test_y = test_data[:, -1].astype(np.int64)
+    test_z = test_data[:, -2].astype(np.int64)
 
-    if DISABLE_TQDM:
-        print(f"Run number {run_num} started", flush=True)
-
-    returns = []
-    if test_data is None:
-        data = train_data.copy()
-        data = np.array_split(data, 5)
-        for fold_num in tqdm(
-            range(5), leave=False, desc="Fold number", disable=DISABLE_TQDM
-        ):
-            fold_train_data = np.concatenate(data[:fold_num] + data[fold_num + 1 :])
-            returns.append(
-                train_one_fold(run_num, fold_num, fold_train_data, data[fold_num])
-            )
-    else:
-        returns.append(train_one_fold(run_num, 0, train_data, test_data))
-
-    results_avgs = metrics.combine_results(returns, False)
-    if isinstance(results_avgs, tuple):
-        print("train_one_run() error: [1]")
-        exit()
-
-    return results_avgs
-
-
-def main():
-    """
-    Loads data, start model training, and stores results.
-    """
-    random.seed(42)
-    np.random.seed(42)
-    torch.manual_seed(42)
-
-    print(
-        f"{MODEL}: DATASET={DATASET}, FAIR_COND = {FAIRNESS_CONDITION}, COST_0={COST_0}, COST_1={COST_1}, DEVICE={DEVICE}",
-        flush=True,
+    train_x, val_x, test_x = dataset.data_processing(train_x, val_x, test_x)
+    train_dataset = dataset.CustomDataset(train_x, train_y, train_z)
+    val_dataset = dataset.CustomDataset(val_x, val_y, val_z)
+    test_dataset = dataset.CustomDataset(test_x, test_y, test_z)
+    train_dataloader = torch.utils.data.DataLoader(
+        train_dataset,
+        batch_size=args.batch_size,
+        shuffle=True,
+        num_workers=2,
+        persistent_workers=True,
+        pin_memory=True,
+        prefetch_factor=2,
+    )
+    val_dataloader = torch.utils.data.DataLoader(
+        val_dataset,
+        batch_size=args.batch_size,
+        shuffle=False,
+        num_workers=2,
+        persistent_workers=True,
+        pin_memory=True,
+        prefetch_factor=2,
+    )
+    test_dataloader = torch.utils.data.DataLoader(
+        test_dataset,
+        batch_size=args.batch_size,
+        shuffle=False,
+        num_workers=2,
+        persistent_workers=False,
+        pin_memory=True,
+        prefetch_factor=2,
     )
 
-    if DATASET == "adult":
-        train_data = pd.read_csv("data/adult_train.csv", header=None).to_numpy()
-        test_data = pd.read_csv("data/adult_test.csv", header=None).to_numpy()
-    elif DATASET == "bank":
-        train_data = pd.read_csv("data/bank.csv", header=None).to_numpy()
-        test_data = None
-    elif DATASET == "compas":
-        train_data = pd.read_csv("data/compas.csv", header=None).to_numpy()
-        test_data = None
-    elif DATASET == "default":
-        train_data = pd.read_csv("data/default.csv", header=None).to_numpy()
-        test_data = None
-    elif DATASET == "german":
-        train_data = pd.read_csv("data/german.csv", header=None).to_numpy()
-        test_data = None
+    model = train_model(train_dataloader, val_dataloader, args)
+    run_results = test_model(test_dataloader, model, args)
+    results = {}
+    for key in run_results.keys():
+        results[key] = run_results[key].item()
+    with open(f"{args.output_dir}/run_{args.run_num}_results.json", "w") as f:
+        f.write(json.dumps(results, indent=4))
+    return run_results
+
+
+def main() -> None:
+    """
+    Side effects:
+    1) Creates one of the following directories (also refered to as args.output_dir):
+        a) f"results/{args.dataset}/{args.model}/{'_'.join(args.fairness_conditions)}/{args.cost}"
+        b) f"results/{args.dataset}/{args.model}/none/{args.cost}"
+    2) Creates and writes to results.json in args.output_dir.
+    """
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--model", type=str, choices=["RISAN", "KP1"], required=True)
+    parser.add_argument("--cost", type=float, required=True)
+    parser.add_argument(
+        "--dataset", type=str, choices=["Adult", "Compas", "German"], required=True
+    )
+    parser.add_argument("--gamma", type=float, required=True)
+    parser.add_argument("--lr1", type=float, default=1e-3)
+    parser.add_argument("--lr2", type=float, default=1e-3)
+    parser.add_argument("--tqdm", action=argparse.BooleanOptionalAction, default=False)
+    parser.add_argument(
+        "--fairness_conditions",
+        nargs="*",
+        choices=["pos", "neg", "abs", "tpr", "fpr", "tnr", "fnr", "par", "nar"],
+    )
+
+    args = parser.parse_args()
+    if args.fairness_conditions is not None:
+        args.fairness_conditions.sort()
+        args.output_dir = f"results/{args.dataset}/{args.model}/{'_'.join(args.fairness_conditions)}/{args.cost:f}"
     else:
-        print("main() error: [1]")
-        exit()
+        args.output_dir = f"results/{args.dataset}/{args.model}/none/{args.cost:f}"
+    os.makedirs(args.output_dir, exist_ok=True)
+    args.epochs = 10000
+    args.batch_size = 2048 if args.dataset == "Adult" else 256
+    args.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    returns = []
-    for run_num in tqdm(range(5), desc="Runs", leave=False, disable=DISABLE_TQDM):
-        returns.append(train_one_run(run_num, train_data, test_data))
-    WRITER.flush()
-
-    results_avgs, results_stds = metrics.combine_results(returns, True)
-    if isinstance(results_avgs, str) or isinstance(results_stds, str):
-        print("main() error: [2]")
-        exit()
-
+    returns: list[dict[str, torch.Tensor]] = []
+    for run_num in tqdm(range(10), desc="Runs", leave=False, disable=not args.tqdm):
+        args.run_num = run_num
+        returns.append(run(args))
+    results_avgs, results_stds = metrics.combine_results(returns)
     results = {}
     for key in results_avgs.keys():
-        results[key] = [results_avgs[key].tolist(), results_stds[key].tolist()]
-
-    os.makedirs(
-        f"results/{DATASET}/{MODEL}/{FAIRNESS_CONDITION}",
-        exist_ok=True,
-    )
-    with open(
-        f"results/{DATASET}/{MODEL}/{FAIRNESS_CONDITION}/{COST_0:f}_{COST_1:f}.json",
-        "w",
-    ) as f:
+        results[key] = [results_avgs[key].item(), results_stds[key].item()]
+    with open(f"{args.output_dir}/results.json", "w") as f:
         f.write(json.dumps(results, indent=4))
 
 
 if __name__ == "__main__":
+    random.seed(42)
+    np.random.seed(42)
+    torch.random.manual_seed(42)
     main()

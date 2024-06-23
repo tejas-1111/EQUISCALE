@@ -39,8 +39,16 @@ setup = {
     "n_jobs": 4,
 }
 
-check_run = {"Adult": RUN_ADULT, "Compas": RUN_COMPAS, "German": RUN_GERMAN, "Bank": RUN_BANK, "Default": RUN_DEFAULT}
-datasets = {"Compas": get_compas, "German": get_german, "Adult": get_adult, "Bank": get_bank,"Default": get_default}
+check_run = {
+    "Adult": RUN_ADULT,
+    "Compas": RUN_COMPAS,
+    "German": RUN_GERMAN,
+}
+datasets = {
+    "Compas": get_compas,
+    "German": get_german,
+    "Adult": get_adult,
+}
 seeds = np.arange(10)
 
 # setting alphas to a number means that all groups have the same reject rate
@@ -76,16 +84,15 @@ for method in METHODS:
                     )
                     results.append(result_seed)
 
-                avg, std = combine_results(results, True)
-                pt = Path(f"../results/{data.lower()}/dpabst/ind")
+                avg, std = combine_results(results)
+                pt = Path(f"../results/{data}/dpabst/abs_neg_pos/{alphas:f}")
                 os.makedirs(pt, exist_ok=True)
-                pt = Path(f"../results/{data.lower()}/dpabst/ind/{alphas:f}.json")
-                if isinstance(avg, str) or isinstance(std, str):
-                    print("run_experiments error [1]")
-                    exit()
+                pt = Path(
+                    f"../results/{data}/dpabst/abs_neg_pos/{alphas:f}/results.json"
+                )
                 results = {}
                 for key in avg.keys():
-                    results[key] = [avg[key].tolist(), std[key].tolist()]
+                    results[key] = [avg[key].item(), std[key].item()]
                 with open(
                     pt,
                     "w",

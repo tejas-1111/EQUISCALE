@@ -1,21 +1,14 @@
-name: FairAOC
+name: Fair-AOC
 channels:
-- conda-forge
-- pytorch
 - nvidia
+- pytorch
+- conda-forge
 dependencies:
-- python=3.12
 - jupyter
 - matplotlib
 - numpy
 - pandas
-- PrettyTable
+- python=3.12
 - pytorch
 - pytorch-cuda=12.1
-- scikit-learn
-- torchaudio
-- torchvision
 - tqdm
-- pip:
-  - tensorboard
-
