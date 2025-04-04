@@ -1,0 +1,9 @@
+{
+    "dataset": "german",
+    "model": "kp1",
+    "gamma": 0.7,
+    "lr1": 0.005,
+    "lr2": 0.01,
+    "cost": [0.2],
+    "fairness_conditions": ["pos", "abs", "neg"]
+}
