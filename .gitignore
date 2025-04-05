@@ -10,9 +10,9 @@ wheels/
 .venv/
 
 # Outputs
-dpabst/results
+dpabst/results/*
 
 # Models
-outputs/
+outputs/*
 
 temp/
