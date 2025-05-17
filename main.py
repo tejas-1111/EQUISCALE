@@ -130,7 +130,7 @@ def train_model(
     )
     lambdas_fn = (
         metrics.FairnessConstraints(args.fairness_conditions)
-        if args.fairness_conditions is not None
+        if args.fairness_conditions != "none"
         else None
     )
 
@@ -241,7 +241,7 @@ def train_model(
                 obj += (model_loss + fairness_loss).detach()
 
         obj /= num_batches
-        if obj.item() < 0.9999 * best_loss:
+        if obj.item() < 0.99 * best_loss:
             best_loss = obj.item()
             best_model = deepcopy(model)
             last_improvement = 0
@@ -276,28 +276,28 @@ def run(args) -> dict[str, torch.Tensor]:
         train_dataset,
         batch_size=args.batch_size,
         shuffle=True,
-        num_workers=2,
+        num_workers=1,
         persistent_workers=True,
         pin_memory=True,
-        prefetch_factor=2,
+        prefetch_factor=8,
     )
     val_dataloader = torch.utils.data.DataLoader(
         val_dataset,
         batch_size=args.batch_size,
         shuffle=False,
-        num_workers=2,
+        num_workers=1,
         persistent_workers=True,
         pin_memory=True,
-        prefetch_factor=2,
+        prefetch_factor=8,
     )
     test_dataloader = torch.utils.data.DataLoader(
         test_dataset,
         batch_size=args.batch_size,
         shuffle=False,
-        num_workers=2,
+        num_workers=1,
         persistent_workers=False,
         pin_memory=True,
-        prefetch_factor=2,
+        prefetch_factor=8,
     )
 
     model = train_model(train_dataloader, val_dataloader, args)

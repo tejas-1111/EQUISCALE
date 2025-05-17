@@ -1,9 +1,0 @@
-{
-    "dataset": ["adult", "bank", "compas", "default", "german"],
-    "model": ["risan"],
-    "gamma": [0.1, 0.25, 0.5, 0.75, 1, 1.5, 2, 3, 4, 5],
-    "lr1": [0.1, 0.05, 0.02, 0.01, 0.005, 0.002, 0.001],
-    "lr2": [0.1, 0.05, 0.02, 0.01, 0.005, 0.002, 0.001],
-    "cost": [0.1, 0.25, 0.4],
-    "fairness_conditions": ["", "pos-neg-abs", "tpr-fpr-tnr-fnr-par-nar"]
-}
