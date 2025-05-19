@@ -22,7 +22,7 @@ def is_alive(p: subprocess.Popen):
 
 active_processes = []
 idx = 1
-total = 1
+total = 0
 for config in data["configs"]:
     total += len(config["costs"])
 for config in data["configs"]:
