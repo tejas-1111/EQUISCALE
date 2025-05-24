@@ -55,7 +55,7 @@ datasets = {
 seeds = np.arange(25)
 
 # setting alphas to a number means that all groups have the same reject rate
-alphas_grid = np.linspace(0.4, 0.8, 21)
+alphas_grid = np.linspace(0, 1, 101)
 
 total = len(seeds)
 
@@ -72,6 +72,8 @@ for method in METHODS:
             X, y = datasets[data]()
             sensitives = np.unique(X[:, -1])
             for alphas in alphas_grid:
+                if alphas == 0:
+                    continue
                 results = []
                 print("[Classification rate] {}".format(alphas))
                 for i, seed in enumerate(seeds):
